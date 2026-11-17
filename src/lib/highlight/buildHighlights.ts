@@ -31,6 +31,7 @@ const MNEMONIC_LOOKAHEAD = 40;
 // 하나의 두문자 괄호가 앞쪽 몇 글자 안의 문구까지 설명한다고 볼지
 const MNEMONIC_LOOKBEHIND = 160;
 const CONTEXT = 60;
+const MNEMONIC_SHAPE = /^[가-힣]{2,}(\/[가-힣]+)*$/;
 
 interface Span { start: number; end: number }
 
@@ -162,7 +163,8 @@ function findMnemonics(spans: Span[], s: string, colorAt: (string | undefined)[]
     const hasColorBefore = colorAt.slice(end, bracketStart).some((c, k) => c && !isSpace(s[end + k]));
     if (hasColorBefore) continue;
     const mnemonic = m[2].replace(/\s/g, '');
-    if (!/[가-힣]/.test(mnemonic)) continue;
+    // 두문자는 한글 글자를 '/'로 나눈 형태만 인정. "[12번]", "[판례 3]" 같은 번호 표기는 제외 (2026-11-18 브라우저 확인 중 발견)
+    if (!MNEMONIC_SHAPE.test(mnemonic)) continue;
     for (let k = i; k >= 0; k--) {
       if (spans[k].start < lastBracketEnd || bracketStart - spans[k].start > MNEMONIC_LOOKBEHIND) break;
       if (!result.has(k)) result.set(k, mnemonic);

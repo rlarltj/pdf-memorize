@@ -62,8 +62,13 @@ describe('buildHighlights', () => {
   });
 
   it('이미 다른 괄호 뒤에 있는 문구에는 앞 괄호를 붙이지 않는다', () => {
-    const hs = build('{<가>나} [가] 그리고 {<다>라} [다]');
-    expect(hs.map((h) => h.mnemonic)).toEqual(['가', '다']);
+    const hs = build('{<가>나 <다>라} [가다] 그리고 {<마>바 <사>아} [마사]');
+    expect(hs.map((h) => h.mnemonic)).toEqual(['가다', '마사']);
+  });
+
+  it('번호 같은 괄호는 두문자로 보지 않는다', () => {
+    expect(build('26 {직장폐쇄의 정당성} [12번]')[0].mnemonic).toBeUndefined();
+    expect(build('{<근>로<자>성} [판례 3]')[0].mnemonic).toBeUndefined();
   });
 
   it('문구 전체가 노란색이면 두문자로 보지 않는다', () => {
