@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+
+# 저작물·개인 PDF (공개 저장소라 커밋 금지)
+fixtures/local/

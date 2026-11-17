@@ -1,9 +1,6 @@
-import { getDocument, GlobalWorkerOptions, OPS } from 'pdfjs-dist';
+import { getDocument, OPS } from 'pdfjs-dist';
 import type { PDFPageProxy } from 'pdfjs-dist';
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-GlobalWorkerOptions.workerSrc = workerUrl;
 
 /**
  * 하이라이트 한 덩어리. 색이 달라도 붙어 있는 글자는 한 문구로 합친다.
@@ -102,6 +99,15 @@ async function collectFillRects(page: PDFPageProxy): Promise<Rect[]> {
   return rects;
 }
 
+/** 사각형이 겹치면 나중에 그린(위에 보이는) 색이 이긴다. 두문자 노란색이 문구 배경 위에 칠해지는 경우. */
+function topmostColorAt(rects: Rect[], x: number, y: number): string | undefined {
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const r = rects[i];
+    if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) return r.color;
+  }
+  return undefined;
+}
+
 async function extractFromPage(page: PDFPageProxy, pageNumber: number): Promise<Highlight[]> {
   const rects = await collectFillRects(page);
   if (rects.length === 0) return [];
@@ -118,8 +124,7 @@ async function extractFromPage(page: PDFPageProxy, pageNumber: number): Promise<
       glyphs.forEach((ch, k) => {
         const cx = e + w * (k + 0.5);
         const cy = f + Math.abs(d) * 0.35;
-        const hit = rects.find((r) => cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1);
-        chars.push({ ch, color: hit?.color });
+        chars.push({ ch, color: topmostColorAt(rects, cx, cy) });
       });
     }
     if (item.hasEOL) chars.push({ eol: true });
