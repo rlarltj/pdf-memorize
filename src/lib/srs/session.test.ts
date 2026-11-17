@@ -37,6 +37,15 @@ describe('buildQueue', () => {
     expect(buildQueue(cards, [], NOW).map((c) => c.id)).toEqual(['due-early', 'due-late', 'new-p1', 'new-p3']);
   });
 
+  it('같은 페이지의 새 카드는 PDF 안의 하이라이트 순서대로', () => {
+    const cards = [
+      createSampleCard({ id: 'p2-10', page: 2, highlightId: '2-10' }),
+      createSampleCard({ id: 'p2-2', page: 2, highlightId: '2-2' }),
+      createSampleCard({ id: 'p2-0', page: 2, highlightId: '2-0' }),
+    ];
+    expect(buildQueue(cards, [], NOW).map((c) => c.id)).toEqual(['p2-0', 'p2-2', 'p2-10']);
+  });
+
   it('새 카드는 오늘 이미 본 만큼 빼고 하루 한도까지만', () => {
     const cards = Array.from({ length: 10 }, (_, i) => createSampleCard({ id: `n${i}`, page: i }));
     expect(buildQueue(cards, [reviewOfNew('x'), reviewOfNew('y')], NOW, 5)).toHaveLength(3);

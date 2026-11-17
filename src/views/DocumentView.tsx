@@ -33,7 +33,7 @@ export function DocumentView({ documentId, onBack, onStudy }: Props) {
   const load = useCallback(async () => {
     const [docs, list] = await Promise.all([store.listDocuments(), store.listCards(documentId)]);
     setDoc(docs.find((d) => d.id === documentId) ?? null);
-    setCards(list.sort((a, b) => a.page - b.page || a.createdAt.getTime() - b.createdAt.getTime() || a.type.localeCompare(b.type)));
+    setCards(list.sort((a, b) => a.page - b.page || Number(a.highlightId.split('-')[1]) - Number(b.highlightId.split('-')[1]) || a.type.localeCompare(b.type)));
   }, [documentId]);
 
   useEffect(() => {

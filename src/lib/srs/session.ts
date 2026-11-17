@@ -18,6 +18,8 @@ export interface DailySummary {
 }
 
 const isNew = (c: StoredCard) => c.schedule.state === State.New;
+/** highlightId `${page}-${순번}`의 순번. 같은 페이지 카드는 생성 시각이 같아 이것으로 PDF 순서를 지킨다 */
+const orderInPage = (c: StoredCard) => Number(c.highlightId.split('-')[1] ?? 0);
 
 export function newIntroducedToday(reviewsToday: ReviewRecord[]): number {
   return new Set(reviewsToday.filter((r) => r.previousState === State.New).map((r) => r.cardId)).size;
@@ -34,7 +36,7 @@ export function buildQueue(cards: StoredCard[], reviewsToday: ReviewRecord[], no
   const newLimit = Math.max(0, newPerDay - newIntroducedToday(reviewsToday));
   const fresh = active
     .filter(isNew)
-    .sort((a, b) => a.documentId.localeCompare(b.documentId) || a.page - b.page || a.createdAt.getTime() - b.createdAt.getTime())
+    .sort((a, b) => a.documentId.localeCompare(b.documentId) || a.page - b.page || orderInPage(a) - orderInPage(b) || a.type.localeCompare(b.type))
     .slice(0, newLimit);
   return [...due, ...fresh];
 }
