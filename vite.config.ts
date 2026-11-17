@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
+    setupFiles: ['src/test/setup.ts'],
     // Node 20에는 pdf.js 기본 빌드가 쓰는 API(Promise.withResolvers 등)가 없어 테스트에서는 legacy 빌드 사용
     alias: [{ find: /^pdfjs-dist$/, replacement: 'pdfjs-dist/legacy/build/pdf.mjs' }],
   },

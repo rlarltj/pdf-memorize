@@ -5,6 +5,9 @@ import { buildHighlights, type Highlight, type PageChar } from './buildHighlight
 
 export type { Highlight } from './buildHighlights';
 
+/** pdf.js 보조 데이터 위치. 브라우저는 pdfWorker.ts, 테스트는 vitest setup에서 지정한다 */
+export const pdfAssets: { cMapUrl?: string; standardFontDataUrl?: string } = {};
+
 export interface ExtractResult {
   numPages: number;
   /** PDF 뷰어 앱에서 칠한 Highlight 주석 개수 (배경색 하이라이트와 함께 추출된다) */
@@ -159,7 +162,7 @@ function toPageChars(items: TextItem[], rects: Rect[]): PageChar[] {
 }
 
 export async function extractHighlights(file: ArrayBuffer): Promise<ExtractResult> {
-  const doc = await getDocument({ data: new Uint8Array(file) }).promise;
+  const doc = await getDocument({ data: new Uint8Array(file), cMapPacked: true, ...pdfAssets }).promise;
   const highlights: Highlight[] = [];
   let annotationCount = 0;
   let textChars = 0;
