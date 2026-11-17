@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { HomeView } from './views/HomeView';
 import { StudyView } from './views/StudyView';
+import { DocumentView } from './views/DocumentView';
 import './App.css';
 
 type View = { name: 'home' } | { name: 'study'; documentId?: string } | { name: 'document'; documentId: string };
@@ -12,6 +13,8 @@ export default function App() {
   switch (view.name) {
     case 'study':
       return <StudyView documentId={view.documentId} onExit={home} />;
+    case 'document':
+      return <DocumentView documentId={view.documentId} onBack={home} onStudy={(documentId) => setView({ name: 'study', documentId })} />;
     default:
       return (
         <HomeView
