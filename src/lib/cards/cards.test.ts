@@ -26,6 +26,14 @@ describe('cardsFromHighlights', () => {
     expect(cardsFromHighlights('doc', [h({ id: '1-0', text: '憲 §32③' }), h({ id: '1-5', text: '憲 §32③' })])).toHaveLength(1);
   });
 
+  it('목차 페이지 하이라이트는 빈칸 카드를 만들지 않고 두문자 카드만 만든다', () => {
+    const cards = cardsFromHighlights('doc', [
+      h({ id: '1-0', text: '근기법상 근로자 개념', onIndexPage: true }),
+      h({ id: '1-1', text: '취업규칙 불이익변경', keyLetters: '취불', onIndexPage: true }),
+    ]);
+    expect(cards.map((c) => c.type)).toEqual(['keyLetters']);
+  });
+
   it('한 글자 하이라이트와 한 글자 두문자는 카드로 만들지 않는다', () => {
     const cards = cardsFromHighlights('doc', [h({ text: '없' }), h({ id: '1-2', text: '경영상의 이유', keyLetters: '경' })]);
     expect(cards.map((c) => c.type)).toEqual(['cloze']);

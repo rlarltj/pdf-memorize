@@ -56,7 +56,8 @@ export function cardsFromHighlights(documentId: string, highlights: Highlight[])
       keyLetters: h.keyLetters,
       mnemonic: h.mnemonic,
     };
-    cards.push({ ...base, id: `${key}:cloze`, type: 'cloze' });
+    // 목차·목록 페이지는 앞뒤 문맥이 번호뿐이라 빈칸 카드를 만들지 않는다 (D18)
+    if (!h.onIndexPage) cards.push({ ...base, id: `${key}:cloze`, type: 'cloze' });
     if (h.keyLetters.length >= 2) cards.push({ ...base, id: `${key}:keyLetters`, type: 'keyLetters' });
   }
   return cards;

@@ -18,6 +18,8 @@ export interface Highlight {
   /** 빈칸 카드용 앞뒤 문맥 (같은 문장 안) */
   before: string;
   after: string;
+  /** 목차·판례 목록 같은 표 페이지. 앞뒤 문맥이 옆 칸 번호뿐이라 빈칸 카드로 쓸 수 없다 */
+  onIndexPage?: boolean;
 }
 
 export const KEY_LETTER_COLOR = '255,255,0';
@@ -31,6 +33,9 @@ const MNEMONIC_LOOKAHEAD = 40;
 // 하나의 두문자 괄호가 앞쪽 몇 글자 안의 문구까지 설명한다고 볼지
 const MNEMONIC_LOOKBEHIND = 160;
 const CONTEXT = 60;
+// 판례 번호(2012다85335) 형태가 이만큼 있으면 목차·목록 페이지. 샘플 목차 34개, 본문 0~2개 (D18, 2026-11-18)
+const INDEX_PAGE_CASE_NUMBERS = 10;
+const CASE_NUMBER = /\d{2,4}\s?[가-힣]{1,2}\s?\d{3,}/g;
 const MNEMONIC_SHAPE = /^[가-힣]{2,}(\/[가-힣]+)*$/;
 
 interface Span { start: number; end: number }
@@ -67,6 +72,7 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
     return { ...sp, text, colors: [...colors], keyLetters };
   });
   const mnemonics = findMnemonics(infos, s, colorAt);
+  const onIndexPage = (s.match(CASE_NUMBER)?.length ?? 0) >= INDEX_PAGE_CASE_NUMBERS;
 
   return infos.map((sp, i) => ({
     id: `${page}-${i}`,
@@ -77,6 +83,7 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
     mnemonic: mnemonics.get(i),
     before: contextBefore(s, sp.start),
     after: contextAfter(s, sp.end),
+    ...(onIndexPage ? { onIndexPage } : {}),
   })).filter((h) => h.text.length > 0);
 }
 

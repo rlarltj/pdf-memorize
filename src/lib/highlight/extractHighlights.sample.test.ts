@@ -37,6 +37,11 @@ describe.skipIf(!existsSync(SAMPLE))('실제 샘플 PDF', () => {
     expect(onPage(15)).toContainEqual(expect.objectContaining({ text: '도산을 회피하기 위한 경우에 한정되지 아니하고', mnemonic: '도회한아' }));
   });
 
+  it('목차(1페이지)만 목록 페이지로 판별한다', () => {
+    const indexPages = new Set(r.highlights.filter((h) => h.onIndexPage).map((h) => h.page));
+    expect([...indexPages]).toEqual([1]);
+  });
+
   it('한 글자 하이라이트가 거의 남지 않는다', () => {
     const singles = r.highlights.filter((h) => h.text.replace(/\s/g, '').length === 1);
     expect(singles.length / r.highlights.length).toBeLessThan(0.03);

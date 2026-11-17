@@ -80,6 +80,12 @@ describe('buildHighlights', () => {
     expect(hs.map((h) => h.mnemonic)).toEqual([undefined, '근사']);
   });
 
+  it('판례 번호가 많은 목차 페이지는 표시해 둔다', () => {
+    const rows = Array.from({ length: 10 }, (_, i) => `${i + 1} {주제${i}} 20${10 + i}다${12345 + i}`).join('|');
+    expect(build(rows).every((h) => h.onIndexPage)).toBe(true);
+    expect(build('본문 {근본정신} 2012다85335 참고').some((h) => h.onIndexPage)).toBe(false);
+  });
+
   it('번호 같은 괄호는 두문자로 보지 않는다', () => {
     expect(build('26 {직장폐쇄의 정당성} [12번]')[0].mnemonic).toBeUndefined();
     expect(build('{<근>로<자>성} [판례 3]')[0].mnemonic).toBeUndefined();

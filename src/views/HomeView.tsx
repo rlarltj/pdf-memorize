@@ -9,8 +9,8 @@ import { store, type DocumentRecord, type ImportResult } from '../lib/store';
 import { AuthBar } from '../components/AuthBar';
 import { SYNCED_EVENT, type SyncState } from '../hooks/useSync';
 
-/** 브라우저 메모리에서 처리하므로 너무 큰 파일은 탭이 멈출 수 있다 (결정 대기 D21) */
-const MAX_PDF_BYTES = 100 * 1024 * 1024;
+/** 브라우저 메모리에서 처리하므로 너무 큰 파일은 탭이 멈출 수 있다 (D21: 30MB, 2026-11-18 결정) */
+const MAX_PDF_BYTES = 30 * 1024 * 1024;
 
 interface Props {
   sync: SyncState;
