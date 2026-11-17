@@ -1,0 +1,4 @@
+# Cloudflare Pages 설정. 배포: npm run deploy (로컬) 또는 main push 시 GitHub Actions
+name = "pdf-memorize"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-11-01"
