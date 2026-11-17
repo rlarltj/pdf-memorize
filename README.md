@@ -1,50 +1,41 @@
-# React + TypeScript + Vite
+# pdf-memorize
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+PDF에서 형광펜으로 칠한 부분을 뽑아 암기 카드로 만들고, 복습 일정(FSRS)에 맞춰 학습하는 웹 앱.
 
-Currently, two official plugins are available:
+**https://pdf-memorize.pdf-memorize.workers.dev**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- PDF는 브라우저 안에서만 처리하고 서버로 보내지 않는다
+- 학습 기록은 브라우저(IndexedDB)에 저장된다. 로그인하면 기기 간 동기화 (Supabase 설정 시)
 
-## Expanding the ESLint configuration
+## 지원하는 PDF
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+| 형태 | 지원 |
+|---|---|
+| HWP/Word에서 형광펜·글자 배경색을 넣고 PDF로 저장 | O |
+| PDF 뷰어 앱(굿노트, 아크로뱃 등)의 형광펜 주석 | O |
+| 스캔본·사진 PDF | X |
+| 주석을 병합·평탄화해 내보낸 PDF | X |
 
-- Configure the top-level `parserOptions` property like this:
+문구 첫 글자만 노랗게 칠한 두문자 표시와, 문구 뒤 `[취규불변]` 같은 두문자 괄호를 인식해 두문자 카드를 만든다.
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## 개발
+
+Node 22 이상.
+
+```
+npm install
+npm run dev        # http://localhost:5173
+npm run test
+npm run typecheck
+npm run lint
+npm run deploy     # Cloudflare Workers 정적 자산 (wrangler login 필요)
 ```
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
+main에 push하면 GitHub Actions가 검사 후 자동 배포한다.
 
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
+## 문서
 
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+- `AGENTS.md`: 구조, 추출 원리, 함정, 규칙
+- `docs/adr/`: 아키텍처 결정
+- `docs/setup-deploy.md`, `docs/setup-supabase.md`: 배포·동기화 설정
+- `docs/exec-plans/`: 진행 중인 작업 계획
