@@ -8,7 +8,10 @@ import type { Highlight } from '../highlight/buildHighlights';
 export type CardType = 'cloze' | 'keyLetters';
 
 export interface CardContent {
-  /** `${documentId}:${highlightId}:${type}`. 같은 PDF를 다시 올려도 같은 id가 나와 기록이 이어진다 */
+  /**
+   * `${documentId}:${page}:${문구 해시}:${type}`.
+   * 하이라이트 순번이 아니라 내용으로 만들어, 같은 PDF를 다시 올리거나 추출 로직이 바뀌어도 기록이 이어진다
+   */
   id: string;
   documentId: string;
   highlightId: string;
@@ -24,10 +27,25 @@ export interface CardContent {
 
 const MIN_ANSWER_LENGTH = 2;
 
+/** FNV-1a 32비트. 충돌이 나도 같은 페이지 안의 같은 문구일 가능성이 높아 문제 되지 않는다 */
+function hash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
 export function cardsFromHighlights(documentId: string, highlights: Highlight[]): CardContent[] {
   const cards: CardContent[] = [];
+  const seen = new Set<string>();
   for (const h of highlights) {
     if (h.text.replace(/\s/g, '').length < MIN_ANSWER_LENGTH) continue;
+    const key = `${documentId}:${h.page}:${hash(h.text.replace(/\s/g, ''))}`;
+    // 같은 페이지에 같은 문구가 두 번 칠해져 있으면 카드는 하나만
+    if (seen.has(key)) continue;
+    seen.add(key);
     const base = {
       documentId,
       highlightId: h.id,
@@ -38,8 +56,8 @@ export function cardsFromHighlights(documentId: string, highlights: Highlight[])
       keyLetters: h.keyLetters,
       mnemonic: h.mnemonic,
     };
-    cards.push({ ...base, id: `${documentId}:${h.id}:cloze`, type: 'cloze' });
-    if (h.keyLetters.length >= 2) cards.push({ ...base, id: `${documentId}:${h.id}:keyLetters`, type: 'keyLetters' });
+    cards.push({ ...base, id: `${key}:cloze`, type: 'cloze' });
+    if (h.keyLetters.length >= 2) cards.push({ ...base, id: `${key}:keyLetters`, type: 'keyLetters' });
   }
   return cards;
 }

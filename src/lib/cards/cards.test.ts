@@ -12,7 +12,18 @@ describe('cardsFromHighlights', () => {
       h({ id: '1-0', text: '취업규칙을 근로자에게 불리하게 변경', keyLetters: '취규불변' }),
       h({ id: '1-1', text: '근본정신' }),
     ]);
-    expect(cards.map((c) => c.id)).toEqual(['doc:1-0:cloze', 'doc:1-0:keyLetters', 'doc:1-1:cloze']);
+    expect(cards.map((c) => c.type)).toEqual(['cloze', 'keyLetters', 'cloze']);
+    expect(cards[0].id).toMatch(/^doc:1:[0-9a-z]+:cloze$/);
+  });
+
+  it('카드 id는 순번이 아니라 문구로 정해져 하이라이트 순서가 바뀌어도 같다', () => {
+    const a = cardsFromHighlights('doc', [h({ id: '1-0', text: '근본정신' })]);
+    const b = cardsFromHighlights('doc', [h({ id: '1-0', text: '앞에 추가됨' }), h({ id: '1-1', text: '근본정신' })]);
+    expect(b[1].id).toBe(a[0].id);
+  });
+
+  it('같은 페이지의 같은 문구는 카드 하나로 합친다', () => {
+    expect(cardsFromHighlights('doc', [h({ id: '1-0', text: '憲 §32③' }), h({ id: '1-5', text: '憲 §32③' })])).toHaveLength(1);
   });
 
   it('한 글자 하이라이트와 한 글자 두문자는 카드로 만들지 않는다', () => {
