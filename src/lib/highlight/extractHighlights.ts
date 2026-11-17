@@ -163,7 +163,8 @@ function toPageChars(items: TextItem[], rects: Rect[]): PageChar[] {
 
 /** onProgress(처리한 페이지 수, 전체 페이지 수) */
 export async function extractHighlights(file: ArrayBuffer, onProgress?: (done: number, total: number) => void): Promise<ExtractResult> {
-  const doc = await getDocument({ data: new Uint8Array(file), cMapPacked: true, ...pdfAssets }).promise;
+  // isEvalSupported: false — 악성 PDF 폰트로 임의 코드를 실행하던 취약점(CVE-2024-4367) 계열을 막는 이중 방어. CSP도 eval을 막는다
+  const doc = await getDocument({ data: new Uint8Array(file), cMapPacked: true, isEvalSupported: false, ...pdfAssets }).promise;
   const highlights: Highlight[] = [];
   let annotationCount = 0;
   let textChars = 0;

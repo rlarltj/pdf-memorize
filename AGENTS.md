@@ -35,6 +35,7 @@ PDF에서 하이라이트한 부분을 뽑아 암기 카드로 학습하게 돕�
 | DB 스키마, 여러 계층에 걸친 기능, 되돌리기 어려운 변경 | `docs/PLANS.md` 기준으로 계획 문서부터 작성 |
 | 진행 중인 큰 작업 이어받기 | `docs/exec-plans/active/` |
 | 하이라이트 추출 로직 수정 | 아래 "하이라이트 추출 원리"와 `src/lib/highlight/*.test.ts` |
+| 보안에 영향이 있는 변경 (HTML 렌더링, 새 테이블, 서버 코드, CSP) | `docs/security.md` |
 | 동기화·Supabase | `docs/setup-supabase.md`, `src/lib/sync/sync.test.ts`(기기 2대 시나리오) |
 
 ## 하이라이트 추출 원리
