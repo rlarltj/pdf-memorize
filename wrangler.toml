@@ -1,4 +1,9 @@
-# Cloudflare Pages 설정. 배포: npm run deploy (로컬) 또는 main push 시 GitHub Actions
+# Cloudflare Workers 정적 자산으로 배포. 서버 코드(Worker 스크립트) 없이 dist만 올린다.
+# Pages가 Workers로 통합되어 새 wrangler는 Pages 생성을 Workers로 넘긴다 (2026-11-18, docs/setup-deploy.md)
+# 배포: npm run deploy (로컬) 또는 main push 시 GitHub Actions
 name = "pdf-memorize"
-pages_build_output_dir = "dist"
 compatibility_date = "2026-11-01"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"

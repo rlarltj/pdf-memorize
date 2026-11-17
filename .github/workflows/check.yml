@@ -27,7 +27,7 @@ jobs:
       - run: npm run build
 
   deploy:
-    # main에 push되고 검사를 통과하면 Cloudflare Pages에 배포
+    # main에 push되고 검사를 통과하면 Cloudflare Workers(정적 자산)에 배포
     needs: check
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -55,4 +55,4 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - if: steps.gate.outputs.enabled == 'true'
-        run: npm ci && npm run build && npx wrangler pages deploy --branch main
+        run: npm ci && npm run build && npx wrangler deploy

@@ -9,7 +9,7 @@
 
 ## 결정
 
-- 프론트: Cloudflare Pages 정적 호스팅
+- 프론트: Cloudflare 정적 호스팅. 처음엔 Pages로 정했으나 Pages가 Workers로 통합되어 Workers 정적 자산으로 배포 (2026-11-18 갱신)
 - 인증·DB: Supabase 서울 리전. Auth(Kakao/Google OAuth), Postgres + RLS
 - 별도 API 서버는 두지 않는다. LLM 등 비밀 키가 필요한 기능이 생기면 Supabase Edge Functions 또는 Cloudflare Workers를 추가한다
 - GitHub는 개인 저장소 하나에 프론트와 `supabase/`(마이그레이션, 함수)를 함께 둔다. 협업자나 저장소가 늘면 Organization으로 transfer
