@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Actions 탭에서 수동 실행 (재배포 등)
+  workflow_dispatch:
 
 concurrency:
   group: check-${{ github.ref }}
@@ -29,7 +31,7 @@ jobs:
   deploy:
     # main에 push되고 검사를 통과하면 Cloudflare Workers(정적 자산)에 배포
     needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
