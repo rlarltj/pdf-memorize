@@ -189,9 +189,17 @@ mark.answer { background: linear-gradient(transparent 12%, var(--mark) 12%, var(
 .card-row .quote .context { color: var(--text-soft); }
 
 /* ---------- 원문 보기 ---------- */
-main.page-view { max-width: 920px; }
+/* 원문은 데스크톱 화면 폭을 쓴다. 배율은 .pdf-pages 폭으로 조절하고 넘치면 가로 스크롤 */
+main.page-view { max-width: none; padding-left: 24px; padding-right: 24px; }
+main.page-view > .page-toolbar, main.page-view > .brand, main.page-view > .page-help, main.page-view > .notice { max-width: 1100px; margin-left: auto; margin-right: auto; }
+.pdf-scroll { overflow-x: auto; padding-bottom: 8px; }
+.pdf-pages { margin: 0 auto; }
+.zoom { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.zoom button { font-size: 15px; min-width: 32px; }
+.zoom .zoom-label { font-size: 13px; min-width: 64px; font-variant-numeric: tabular-nums; }
+.zoom .zoom-label.on { color: var(--accent); font-weight: 600; }
 .page-toolbar {
-  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px;
   padding: 8px 0; margin: -8px 0 4px; background: var(--bg);
 }
 .page-toolbar .filters { margin: 0; }

@@ -7,6 +7,33 @@ import type { PdfDocument } from '../lib/highlight/extractHighlights';
 import { loadPdfTools } from '../lib/highlight/loadExtractor';
 import { store, type DocumentRecord } from '../lib/store';
 
+/** 원문 배율. 'fit'은 화면 폭에 맞춤 (최대 FIT_MAX) */
+type Zoom = 'fit' | number;
+const ZOOM_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2];
+/** 배율 100%일 때 페이지 폭(px). A4 기준 본문 글자가 약 14px */
+const BASE_WIDTH = 900;
+const FIT_MAX = 1100;
+const ZOOM_KEY = 'pdf-memorize.zoom';
+
+function loadZoom(): Zoom {
+  try {
+    const v = localStorage.getItem(ZOOM_KEY);
+    if (!v || v === 'fit') return 'fit';
+    const n = Number(v);
+    return ZOOM_STEPS.includes(n) ? n : 'fit';
+  } catch {
+    return 'fit';
+  }
+}
+
+function saveZoom(z: Zoom) {
+  try {
+    localStorage.setItem(ZOOM_KEY, String(z));
+  } catch {
+    // 저장소를 못 쓰는 환경이면 이번 화면에서만 유지
+  }
+}
+
 interface Props {
   documentId: string;
   onBack: () => void;
@@ -30,6 +57,35 @@ export function PageView({ documentId, onBack }: Props) {
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [allKeys, setAllKeys] = useState<Set<string>>(new Set());
+  const [zoom, setZoomState] = useState<Zoom>(loadZoom);
+  const setZoom = useCallback((z: Zoom) => {
+    setZoomState(z);
+    saveZoom(z);
+  }, []);
+  const stepZoom = useCallback((dir: 1 | -1) => {
+    setZoomState((z) => {
+      const cur = z === 'fit' ? 1 : z;
+      const steps = dir > 0 ? ZOOM_STEPS : [...ZOOM_STEPS].reverse();
+      const next = steps.find((s) => (dir > 0 ? s > cur : s < cur)) ?? cur;
+      saveZoom(next);
+      return next;
+    });
+  }, []);
+  const zoomIn = useCallback(() => stepZoom(1), [stepZoom]);
+  const zoomOut = useCallback(() => stepZoom(-1), [stepZoom]);
+
+  // 키보드: + 확대, - 축소, 0 폭 맞춤 (입력 중에는 무시)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === '+' || e.key === '=') zoomIn();
+      else if (e.key === '-') zoomOut();
+      else if (e.key === '0') setZoom('fit');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomIn, zoomOut, setZoom]);
   const cache = useRef(new Map<number, Promise<Highlight[]>>());
   const tools = useRef<Awaited<ReturnType<typeof loadPdfTools>> | null>(null);
 
@@ -125,6 +181,13 @@ export function PageView({ documentId, onBack }: Props) {
     <main className="page-view">
       <div className="page-toolbar">
         <button className="link" onClick={onBack}>← 홈</button>
+        <div className="zoom" role="group" aria-label="배율">
+          <button className="quiet" onClick={zoomOut} aria-label="축소 (-)" title="축소 (-)">−</button>
+          <button className={`quiet zoom-label${zoom === 'fit' ? ' on' : ''}`} onClick={() => setZoom('fit')} title="폭 맞춤 (0)">
+            {zoom === 'fit' ? '폭 맞춤' : `${Math.round(zoom * 100)}%`}
+          </button>
+          <button className="quiet" onClick={zoomIn} aria-label="확대 (+)" title="확대 (+)">+</button>
+        </div>
         <div className="filters" role="tablist" aria-label="보기 방식">
           <button role="tab" aria-selected={mode === 'study'} className={mode === 'study' ? 'on' : ''} onClick={() => setMode('study')}>
             암기
@@ -166,20 +229,22 @@ export function PageView({ documentId, onBack }: Props) {
         </div>
       )}
       {load.status === 'ready' && (
-        <div className="pdf-pages">
-          {Array.from({ length: load.doc.numPages }, (_, i) => (
-            <PdfPage
-              key={i + 1}
-              doc={load.doc}
-              pageNumber={i + 1}
-              loadHighlights={loadHighlights}
-              mode={mode}
-              excluded={excluded}
-              revealed={revealed}
-              onToggleBlank={onToggleBlank}
-              onToggleReveal={onToggleReveal}
-            />
-          ))}
+        <div className="pdf-scroll">
+          <div className="pdf-pages" style={{ width: zoom === 'fit' ? `min(100%, ${FIT_MAX}px)` : `${BASE_WIDTH * zoom}px` }}>
+            {Array.from({ length: load.doc.numPages }, (_, i) => (
+              <PdfPage
+                key={i + 1}
+                doc={load.doc}
+                pageNumber={i + 1}
+                loadHighlights={loadHighlights}
+                mode={mode}
+                excluded={excluded}
+                revealed={revealed}
+                onToggleBlank={onToggleBlank}
+                onToggleReveal={onToggleReveal}
+              />
+            ))}
+          </div>
         </div>
       )}
     </main>

@@ -37,6 +37,25 @@ function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed
   const [near, setNear] = useState(false);
   const [aspect, setAspect] = useState(1.414);
   const [overlays, setOverlays] = useState<Overlay[] | null>(null);
+  // 창 크기·배율·브라우저 확대가 바뀌면 그 해상도로 다시 그린다. 처음 그린 해상도로 늘리면 흐려진다
+  const [renderKey, setRenderKey] = useState('');
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const update = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setRenderKey(`${Math.round(el.clientWidth)}@${window.devicePixelRatio}`), 120);
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    update();
+    return () => {
+      ro.disconnect();
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -81,7 +100,7 @@ function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed
   useEffect(() => {
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
-    if (!canvas || !wrap) return;
+    if (!canvas || !wrap || !renderKey) return;
     if (!near) {
       canvas.width = 0;
       canvas.height = 0;
@@ -93,7 +112,8 @@ function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed
       const page = await doc.getPage(pageNumber);
       if (cancelled) return;
       const base = page.getViewport({ scale: 1 });
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // 고배율 모니터·브라우저 확대에서도 선명하게. 캔버스가 너무 커지지 않게 3배에서 자른다
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
       const viewport = page.getViewport({ scale: (wrap.clientWidth / base.width) * dpr });
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
@@ -104,7 +124,7 @@ function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed
       cancelled = true;
       task?.cancel();
     };
-  }, [near, doc, pageNumber]);
+  }, [near, doc, pageNumber, renderKey]);
 
   return (
     <section className="pdf-page" aria-label={`${pageNumber}쪽`}>
