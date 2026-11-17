@@ -9,6 +9,7 @@ export interface DocumentRecord {
   numPages: number;
   highlightCount: number;
   createdAt: Date;
+  /** 마지막 수정 시각(클라이언트). 동기화 충돌 시 더 최근 것이 이긴다 */
   updatedAt: Date;
 }
 
@@ -19,10 +20,12 @@ export interface StoredCard extends CardContent {
   /** 사용자가 정답 문구를 고쳤는지. 재추출 시 덮어쓰지 않는다 */
   edited: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ReviewRecord {
-  id?: number;
+  /** 클라이언트가 만든 UUID. 동기화로 다시 보내도 중복되지 않는다 */
+  id: string;
   cardId: string;
   documentId: string;
   grade: Grade;
@@ -37,17 +40,54 @@ export interface ImportResult {
   kept: number;
 }
 
+/** 아직 서버에 알리지 않은 삭제 */
+export interface Deletion {
+  kind: 'document' | 'card';
+  id: string;
+  deletedAt: Date;
+}
+
+export interface Tombstone {
+  id: string;
+  deletedAt: Date;
+}
+
+/** 원격에서 받아 로컬에 반영할 변경 */
+export interface RemoteChanges {
+  documents: DocumentRecord[];
+  cards: StoredCard[];
+  reviews: ReviewRecord[];
+  /** 원격에서 지워진 대상과 지운 시각. 로컬이 그 뒤에 다시 만들었으면 지우지 않는다 */
+  deletedDocuments: Tombstone[];
+  deletedCards: Tombstone[];
+}
+
 /**
- * 학습 데이터 저장소. 지금은 IndexedDB 구현만 있고, 로그인하면 Supabase 구현으로 동기화한다.
+ * 학습 데이터 저장소. 로컬(IndexedDB)이 기본이고, 로그인하면 동기화 엔진이 원격과 맞춘다.
+ * 화면 코드는 이 인터페이스의 앞부분만 쓴다. 뒷부분(동기화용)은 sync 엔진 전용.
  */
 export interface StudyStore {
   listDocuments(): Promise<DocumentRecord[]>;
-  /** 문서와 카드를 저장한다. 이미 있는 카드는 복습 기록과 사용자 수정을 유지하고 내용만 갱신한다 */
+  /** 문서와 카드를 저장한다. 이미 있는 카드는 복습 일정과 사용자 수정을 유지하고 내용만 갱신한다 */
   importDocument(doc: Omit<DocumentRecord, 'createdAt' | 'updatedAt'>, cards: CardContent[], now: Date): Promise<ImportResult>;
   deleteDocument(id: string): Promise<void>;
   listCards(documentId?: string): Promise<StoredCard[]>;
+  /** 카드를 저장하고 updatedAt을 갱신한다 */
   putCard(card: StoredCard): Promise<void>;
   deleteCard(id: string): Promise<void>;
-  addReview(review: ReviewRecord): Promise<void>;
+  addReview(review: Omit<ReviewRecord, 'id'>): Promise<void>;
   listReviewsSince(since: Date): Promise<ReviewRecord[]>;
+
+  // --- 동기화용 ---
+  changedSince(since: Date): Promise<{ documents: DocumentRecord[]; cards: StoredCard[] }>;
+  unsyncedReviews(): Promise<ReviewRecord[]>;
+  markReviewsSynced(ids: string[]): Promise<void>;
+  pendingDeletions(): Promise<Deletion[]>;
+  clearDeletions(deletions: Deletion[]): Promise<void>;
+  /** 원격 변경을 반영한다. 더 최근(updatedAt) 것만 덮어쓰고, 삭제 기록은 남기지 않는다 */
+  applyRemote(changes: RemoteChanges): Promise<void>;
+  getMeta(key: string): Promise<string | undefined>;
+  setMeta(key: string, value: string): Promise<void>;
+  /** 로그아웃 등으로 동기화 상태를 처음부터 다시 시작할 때 */
+  resetSyncState(): Promise<void>;
 }

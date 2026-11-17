@@ -28,3 +28,8 @@ dist-ssr
 
 # 저작물·개인 PDF (공개 저장소라 커밋 금지)
 fixtures/local/
+
+# 환경 변수 (Supabase 키 등). 예시만 커밋
+.env
+.env.*
+!.env.example

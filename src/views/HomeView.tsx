@@ -5,8 +5,11 @@ import { extractHighlights } from '../lib/highlight/extractHighlights';
 import { describeLoadError, diagnose } from '../lib/highlight/diagnose';
 import { startOfDay, summarize, type DailySummary } from '../lib/srs/session';
 import { store, type DocumentRecord, type ImportResult } from '../lib/store';
+import { AuthBar } from '../components/AuthBar';
+import { SYNCED_EVENT, type SyncState } from '../hooks/useSync';
 
 interface Props {
+  sync: SyncState;
   onStudy: (documentId?: string) => void;
   onOpenDocument: (documentId: string) => void;
 }
@@ -23,7 +26,7 @@ type UploadState =
   | { status: 'error'; fileName: string; message: string }
   | { status: 'unsupported'; fileName: string; message: string };
 
-export function HomeView({ onStudy, onOpenDocument }: Props) {
+export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
   const [docs, setDocs] = useState<DocRow[] | null>(null);
   const [total, setTotal] = useState<DailySummary | null>(null);
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
@@ -42,6 +45,9 @@ export function HomeView({ onStudy, onOpenDocument }: Props) {
 
   useEffect(() => {
     void refresh();
+    const onSynced = () => void refresh();
+    window.addEventListener(SYNCED_EVENT, onSynced);
+    return () => window.removeEventListener(SYNCED_EVENT, onSynced);
   }, [refresh]);
 
   const onFile = async (file: File | undefined) => {
@@ -71,6 +77,7 @@ export function HomeView({ onStudy, onOpenDocument }: Props) {
       );
       setUpload({ status: 'done', fileName: file.name, result });
       await refresh();
+      void sync.syncNow();
     } catch (e) {
       setUpload({ status: 'error', fileName: file.name, message: e instanceof Error ? e.message : String(e) });
     }
@@ -80,10 +87,12 @@ export function HomeView({ onStudy, onOpenDocument }: Props) {
     if (!confirm(`"${d.name}"와 카드 ${d.cardCount}장, 복습 기록을 모두 지울까요?`)) return;
     await store.deleteDocument(d.id);
     await refresh();
+    void sync.syncNow();
   };
 
   return (
     <main>
+      <AuthBar sync={sync} />
       <h1>PDF 하이라이트 암기</h1>
       <p className="hint">파일은 서버로 전송되지 않고 브라우저 안에서만 처리됩니다.</p>
 

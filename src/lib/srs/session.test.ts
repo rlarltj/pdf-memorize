@@ -12,7 +12,7 @@ function createSampleCard(over: Partial<StoredCard> = {}): StoredCard {
     id: over.id ?? 'doc:1:a:cloze', documentId: 'doc', highlightId: '1-0', type: 'cloze', page: 1,
     answer: '근본정신', before: '', after: '', keyLetters: '',
   };
-  return { ...content, schedule: newSchedule(NOW), suspended: false, edited: false, createdAt: NOW, ...over };
+  return { ...content, schedule: newSchedule(NOW), suspended: false, edited: false, createdAt: NOW, updatedAt: NOW, ...over };
 }
 
 /** 한 번 "알맞음"으로 복습해 며칠 뒤로 미뤄진 카드 */
@@ -23,7 +23,7 @@ function createReviewedCard(id: string, dueOffsetMs: number): StoredCard {
   return { ...c, schedule: { ...schedule, due: new Date(NOW.getTime() + dueOffsetMs) } };
 }
 
-const reviewOfNew = (cardId: string): ReviewRecord => ({ cardId, documentId: 'doc', grade: 3, previousState: State.New, reviewedAt: NOW });
+const reviewOfNew = (cardId: string): ReviewRecord => ({ id: cardId, cardId, documentId: 'doc', grade: 3, previousState: State.New, reviewedAt: NOW });
 
 describe('buildQueue', () => {
   it('복습 예정이 지난 카드를 예정 시각 순으로 먼저, 그다음 새 카드를 페이지 순으로', () => {

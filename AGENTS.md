@@ -5,8 +5,8 @@ PDF에서 하이라이트한 부분을 뽑아 암기 카드로 학습하게 돕�
 
 ## 현재 상태
 
-- 완료: 하이라이트 추출 프로토타입 (`src/lib/extractHighlights.ts`), 추출 결과 목록 화면 (`src/App.tsx`)
-- 다음: 한 글자 두문자를 문장 단위로 묶기, 암기 카드 화면, Supabase 연동(로그인·동기화)
+- MVP 진행 중: `docs/exec-plans/active/2026-11-18-mvp.md` (진행 상황과 결정 대기 목록)
+- 구조: `src/lib/highlight`(추출) → `src/lib/cards`(카드 생성) → `src/lib/srs`(FSRS 일정·학습 큐) → `src/lib/store`(IndexedDB) ↔ `src/lib/sync`(Supabase 동기화). 화면은 `src/views`
 
 ## 지원 범위
 
@@ -32,7 +32,8 @@ PDF에서 하이라이트한 부분을 뽑아 암기 카드로 학습하게 돕�
 | 아키텍처·인프라 관련 판단 | `docs/adr/` (결정과 이유) |
 | DB 스키마, 여러 계층에 걸친 기능, 되돌리기 어려운 변경 | `docs/PLANS.md` 기준으로 계획 문서부터 작성 |
 | 진행 중인 큰 작업 이어받기 | `docs/exec-plans/active/` |
-| 하이라이트 추출 로직 수정 | 아래 "하이라이트 추출 원리"와 `src/lib/extractHighlights.test.ts` |
+| 하이라이트 추출 로직 수정 | 아래 "하이라이트 추출 원리"와 `src/lib/highlight/*.test.ts` |
+| 동기화·Supabase | `docs/setup-supabase.md`, `src/lib/sync/sync.test.ts`(기기 2대 시나리오) |
 
 ## 하이라이트 추출 원리
 
@@ -48,15 +49,23 @@ HWP/Word 배경색은 PDF 주석이 아니라 글자 뒤에 그려진 색 사각
 - 겹친 사각형은 마지막 것이 이긴다. 처음 것을 쓰면 두문자가 누락된다 (2026-11-18 테스트로 발견해 수정)
 - 회색(표 음영), 흰색, 진한 색(글자색·제목 배경)은 하이라이트가 아니다 (`isHighlightColor`)
 - 글자 폭을 텍스트 아이템 폭 ÷ 글자 수로 추정한다. 한글처럼 폭이 고른 글꼴에서는 맞지만, 비례폭 영문은 경계가 한두 글자 어긋날 수 있다. 그래서 테스트 PDF는 고정폭 폰트(Courier)로 만든다
-- 한 글자 하이라이트(두문자만 칠한 경우)가 많다. 현재는 화면에서 기본 숨김
-- pdf.js 워커 설정은 `src/lib/pdfWorker.ts`(브라우저 전용)에만 둔다. 추출 로직은 Node 테스트에서도 import되므로 브라우저 전용 코드를 넣지 않는다
+- 회색(평균 밝기 190~235)도 문구 음영으로 쓰인다. 아주 연한 회색(242 등)은 표 배경이라 제외
+- 첫 글자만 칠한 두문자는 이웃 구간과 묶고 단어 끝까지 넓힌다. 칠하지 않은 공백은 양쪽이 모두 노란 두문자일 때만 끊는다 (`rawSpans` 주석)
+- 문구 뒤 `[인조운독]` 같은 괄호는 두문자 원문(`mnemonic`)이다
+- 카드 id는 페이지+문구 해시. 하이라이트 순번으로 만들면 추출 로직이 바뀔 때 복습 기록이 끊긴다
+- 동기화 테스트의 기준 시각은 실제 시각보다 과거여야 한다. "마지막으로 올린 시각 이후 변경"을 실제 시계로 판정한다 (2026-11-18 테스트 실패로 발견)
+- pdf.js 워커 설정은 `src/lib/highlight/pdfWorker.ts`(브라우저 전용)에만 둔다. 추출 로직은 Node 테스트에서도 import되므로 브라우저 전용 코드를 넣지 않는다
 - **공개 저장소다.** `fixtures/local/`(저작물 PDF)은 gitignore 대상이며 절대 커밋하지 않는다. 샘플 회귀 테스트는 이 파일이 있을 때만 실행되므로 CI에서는 skip된다
 
 ## 테스트
 
 - 테스트 파일은 소스 옆에 `*.test.ts`로 둔다
-- `src/lib/extractHighlights.test.ts`: pdf-lib로 HWP 구조를 흉내 낸 PDF를 테스트 안에서 생성
-- `src/lib/extractHighlights.sample.test.ts`: 실제 샘플 PDF 회귀 테스트. 추출 로직을 바꾸면 기대값이 실제 렌더링과 맞는지 다시 확인한다
+- 테스트 데이터는 `createSampleX()` 형태의 팩토리로 만든다
+- `src/lib/highlight/buildHighlights.test.ts`: 문구 묶기 로직을 `{문구}`·`<두문자>` 표기법 문자열로 검증
+- `src/lib/highlight/extractHighlights.test.ts`: pdf-lib로 HWP 구조를 흉내 낸 PDF를 테스트 안에서 생성
+- `src/lib/highlight/extractHighlights.sample.test.ts`: 실제 샘플 PDF 회귀 테스트. 추출 로직을 바꾸면 기대값이 실제 렌더링과 맞는지 다시 확인한다
+- IndexedDB는 `fake-indexeddb/auto`로, 원격은 `MemoryRemote`로 테스트한다
+- 로컬 디버깅: `SAMPLE_PAGES=2,15 npx vitest run scripts/dump-highlights.test.ts`
 
 ## 검증
 

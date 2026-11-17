@@ -87,3 +87,7 @@ mark.answer { background: var(--mark); color: inherit; padding: 0 2px; border-ra
 .card-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .card-row.suspended { opacity: 0.5; }
 .card-row .row-actions { margin-top: 6px; }
+
+.auth-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0 12px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.auth-bar .hint { margin: 0; }
+button.kakao { background: #fee500; color: #191919; border-color: #fee500; }
