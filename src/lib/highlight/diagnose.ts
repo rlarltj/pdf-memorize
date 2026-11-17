@@ -38,7 +38,7 @@ export function diagnose(r: ExtractResult): Diagnosis {
     return {
       kind: 'noHighlights',
       usable: false,
-      message: '하이라이트를 찾지 못했습니다. HWP/Word의 형광펜·글자 배경색이나 PDF 뷰어 앱의 형광펜으로 칠한 PDF를 올려 주세요.',
+      message: '하이라이트를 찾지 못했습니다. HWP/Word의 형광펜·글자 배경색이나 PDF 뷰어 앱(굿노트, 아크로뱃 등)의 형광펜으로 칠한 PDF를 올려 주세요. 앱에서 내보낼 때 "주석 병합"이나 "평탄화"를 켜면 형광펜이 그림으로 바뀌어 읽을 수 없습니다.',
     };
   }
   return { kind: 'ok', usable: true };

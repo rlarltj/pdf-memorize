@@ -7,7 +7,7 @@ export type { Highlight } from './buildHighlights';
 
 export interface ExtractResult {
   numPages: number;
-  /** PDF 뷰어 앱에서 칠한 Highlight 주석 개수 */
+  /** PDF 뷰어 앱에서 칠한 Highlight 주석 개수 (배경색 하이라이트와 함께 추출된다) */
   annotationCount: number;
   /** 추출된 전체 글자 수. 0이면 스캔본(이미지 PDF) */
   textChars: number;
@@ -20,7 +20,7 @@ export interface ExtractResult {
 const BROKEN_CHAR = /[\uE000-\uF8FF\uFFFD\u0000-\u0008\u000E-\u001F]/g;
 
 type Matrix = [number, number, number, number, number, number];
-interface Rect { x0: number; y0: number; x1: number; y1: number; color: string }
+export interface Rect { x0: number; y0: number; x1: number; y1: number; color: string }
 
 const multiply = (m: Matrix, n: number[]): Matrix => [
   m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1],
@@ -104,6 +104,32 @@ async function collectFillRects(page: PDFPageProxy): Promise<Rect[]> {
   return rects;
 }
 
+interface HighlightAnnotation {
+  subtype: string;
+  quadPoints?: ArrayLike<number> | null;
+  color?: ArrayLike<number> | null;
+}
+
+/**
+ * PDF 뷰어 앱(굿노트, 아크로뱃 등)의 Highlight 주석을 사각형으로 바꾼다.
+ * quadPoints는 사각형마다 8개 값(네 꼭짓점 x,y)이 이어진 배열이다 (pdf.js 4.x).
+ * 주석은 사용자가 고른 색을 그대로 쓰고 밝기 필터를 거치지 않는다. 진한 색 형광펜도 하이라이트다.
+ */
+export function annotationRects(annotations: HighlightAnnotation[]): Rect[] {
+  const rects: Rect[] = [];
+  for (const a of annotations) {
+    if (a.subtype !== 'Highlight' || !a.quadPoints) continue;
+    const color = a.color && a.color.length >= 3 ? Array.from(a.color).slice(0, 3).join(',') : '255,255,0';
+    const q = a.quadPoints;
+    for (let i = 0; i + 7 < q.length; i += 8) {
+      const xs = [q[i], q[i + 2], q[i + 4], q[i + 6]];
+      const ys = [q[i + 1], q[i + 3], q[i + 5], q[i + 7]];
+      rects.push({ x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), color });
+    }
+  }
+  return rects;
+}
+
 /** 사각형이 겹치면 나중에 그린(위에 보이는) 색이 이긴다. 두문자 노란색이 문구 배경 위에 칠해지는 경우. */
 function topmostColorAt(rects: Rect[], x: number, y: number): string | undefined {
   for (let i = rects.length - 1; i >= 0; i--) {
@@ -140,14 +166,16 @@ export async function extractHighlights(file: ArrayBuffer): Promise<ExtractResul
   let brokenChars = 0;
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
-    annotationCount += (await page.getAnnotations()).filter((a) => a.subtype === 'Highlight').length;
+    const annotations = (await page.getAnnotations()) as HighlightAnnotation[];
+    annotationCount += annotations.filter((a) => a.subtype === 'Highlight').length;
     const items = (await page.getTextContent()).items as TextItem[];
     for (const it of items) {
       const str = it.str?.replace(/\s/g, '') ?? '';
       textChars += str.length;
       brokenChars += str.match(BROKEN_CHAR)?.length ?? 0;
     }
-    const rects = await collectFillRects(page);
+    // 주석은 페이지 내용 위에 그려지므로 배경색 사각형 뒤에 붙여 겹칠 때 이기게 한다
+    const rects = [...(await collectFillRects(page)), ...annotationRects(annotations)];
     if (rects.length > 0) highlights.push(...buildHighlights(toPageChars(items, rects), p));
   }
   await doc.destroy();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { PDFDocument, PDFName, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { extractHighlights } from './extractHighlights';
 
 /**
@@ -25,10 +25,22 @@ function line(page: PDFPage, font: PDFFont, text: string, y: number, marks: Mark
   page.drawText(text, { x, y, size: SIZE, font, color: textColor });
 }
 
-async function buildPdf(draw: (page: PDFPage, font: PDFFont) => void): Promise<ArrayBuffer> {
+/** PDF 뷰어 앱처럼 Highlight 주석을 붙인다. from~to 글자 범위, 색은 0~1 */
+function annotate(doc: PDFDocument, page: PDFPage, font: PDFFont, y: number, from: number, to: number, color = [1, 1, 0]) {
+  const charW = font.widthOfTextAtSize('M', SIZE);
+  const [x0, x1, y0, y1] = [50 + charW * from, 50 + charW * to, y - 3, y + SIZE];
+  const annot = doc.context.obj({
+    Type: 'Annot', Subtype: 'Highlight', Rect: [x0, y0, x1, y1], QuadPoints: [x0, y1, x1, y1, x0, y0, x1, y0], C: color,
+  });
+  const existing = page.node.lookup(PDFName.of('Annots'));
+  const refs = existing ? (existing as unknown as { asArray(): unknown[] }).asArray() : [];
+  page.node.set(PDFName.of('Annots'), doc.context.obj([...refs, doc.context.register(annot)] as never));
+}
+
+async function buildPdf(draw: (page: PDFPage, font: PDFFont, doc: PDFDocument) => void): Promise<ArrayBuffer> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Courier);
-  draw(doc.addPage([600, 800]), font);
+  draw(doc.addPage([600, 800]), font, doc);
   const bytes = await doc.save();
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
@@ -97,5 +109,25 @@ describe('extractHighlights', () => {
       line(page, font, 'red text only', 700, [], RED);
     });
     expect(texts(await extractHighlights(pdf))).toEqual([]);
+  });
+
+  it('PDF 뷰어 앱의 Highlight 주석을 하이라이트로 추출한다', async () => {
+    const pdf = await buildPdf((page, font, doc) => {
+      line(page, font, 'the quick brown fox', 700);
+      annotate(doc, page, font, 700, 4, 15, [0.4, 0.9, 0.4]);
+    });
+    const r = await extractHighlights(pdf);
+    expect(r.annotationCount).toBe(1);
+    expect(texts(r)).toEqual(['quick brown']);
+  });
+
+  it('여러 줄에 걸친 주석과 배경색 하이라이트를 함께 추출한다', async () => {
+    const pdf = await buildPdf((page, font, doc) => {
+      line(page, font, 'first line ends', 700);
+      line(page, font, 'here and more', 680, [{ from: 9, to: 13, color: LIGHT_BLUE }]);
+      annotate(doc, page, font, 700, 11, 15);
+      annotate(doc, page, font, 680, 0, 4);
+    });
+    expect(texts(await extractHighlights(pdf))).toEqual(['ends here', 'more']);
   });
 });
