@@ -39,3 +39,6 @@ public/pdfjs/
 
 # predev/prebuild가 생성
 src/styles/serif.css
+
+# wrangler dev 로컬 상태 (2026-11-18 실수로 커밋되어 제거. 비밀 값 없음 확인)
+.wrangler/
