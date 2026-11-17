@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type DragEvent } from 'react';
 import { cardsFromHighlights } from '../lib/cards/cards';
 import { sha256 } from '../lib/fileHash';
 import { loadExtractor } from '../lib/highlight/loadExtractor';
@@ -34,6 +34,7 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
   const [docs, setDocs] = useState<DocRow[] | null>(null);
   const [total, setTotal] = useState<DailySummary | null>(null);
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
+  const [dragOver, setDragOver] = useState(false);
 
   const refresh = useCallback(async () => {
     const now = new Date();
@@ -99,41 +100,92 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
     void sync.syncNow();
   };
 
+  const busy = upload.status === 'working';
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (!busy) void onFile(e.dataTransfer.files?.[0]);
+  };
+
   return (
     <main>
       <AuthBar sync={sync} />
-      <h1>PDF 하이라이트 암기</h1>
-      <p className="hint">파일은 서버로 전송되지 않고 브라우저 안에서만 처리됩니다.</p>
+      <header className="brand">
+        <h1>하이라이트 암기</h1>
+        <span className="tagline">칠한 문장을 오래 기억하기</span>
+      </header>
 
-      <section className="notice">
-        <strong>오늘 학습</strong>
-        {total ? (
-          <p>
-            복습 {total.due}장 · 새 카드 {total.newAvailable}장 · 오늘 {total.reviewedToday}회 복습
-          </p>
-        ) : (
-          <p>불러오는 중...</p>
-        )}
+      <section className="today" aria-label="오늘 학습">
+        <div className="today-label">오늘 학습</div>
+        <div className="today-stats">
+          <div className="stat">
+            <strong>{total?.due ?? '–'}</strong>
+            <span>복습할 카드</span>
+          </div>
+          <div className="stat">
+            <strong>{total?.newAvailable ?? '–'}</strong>
+            <span>새 카드</span>
+          </div>
+          <div className="stat">
+            <strong>{total?.reviewedToday ?? '–'}</strong>
+            <span>오늘 복습</span>
+          </div>
+        </div>
         <button className="primary" disabled={!total || total.due + total.newAvailable === 0} onClick={() => onStudy()}>
-          학습 시작
+          {total && total.due + total.newAvailable === 0 && total.reviewedToday > 0 ? '오늘 학습 완료' : '학습 시작'}
         </button>
       </section>
 
       <h2>PDF 추가</h2>
-      <input type="file" accept="application/pdf" onChange={(e) => onFile(e.target.files?.[0])} disabled={upload.status === 'working'} />
-      {upload.status === 'working' && (
-        <p>
-          {upload.fileName} 분석 중{upload.total ? ` (${upload.done}/${upload.total}쪽)` : '...'}
-        </p>
-      )}
+      <label
+        className={`dropzone${dragOver ? ' over' : ''}${busy ? ' busy' : ''}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+      >
+        <input
+          type="file"
+          accept="application/pdf"
+          disabled={busy}
+          onChange={(e) => {
+            void onFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+        {busy ? (
+          <>
+            <div className="dropzone-title">{upload.fileName}</div>
+            <div className="hint">{upload.total ? `${upload.done} / ${upload.total}쪽 분석 중` : '여는 중'}</div>
+            <div className="progress" aria-hidden>
+              <div style={{ width: `${upload.total ? (100 * (upload.done ?? 0)) / upload.total : 5}%` }} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="dropzone-title">PDF를 끌어다 놓거나 눌러서 선택</div>
+            <div className="hint">형광펜·글자 배경색을 칠한 PDF · 30MB까지 · 파일은 이 브라우저 밖으로 나가지 않습니다</div>
+          </>
+        )}
+      </label>
       {upload.status === 'done' && (
-        <p>
-          {upload.fileName}: 새 카드 {upload.result.added}장
-          {upload.result.updated > 0 && `, 기존 카드 ${upload.result.updated}장 갱신`}
-          {upload.result.kept > 0 && `, 직접 고친 카드 ${upload.result.kept}장 유지`}
-        </p>
+        <div className="notice">
+          <strong>{upload.fileName}</strong>
+          <p>
+            새 카드 {upload.result.added}장
+            {upload.result.updated > 0 && ` · 기존 카드 ${upload.result.updated}장 갱신`}
+            {upload.result.kept > 0 && ` · 직접 고친 카드 ${upload.result.kept}장 유지`}
+          </p>
+        </div>
       )}
-      {upload.status === 'error' && <p className="error">{upload.fileName}: {upload.message}</p>}
+      {upload.status === 'error' && (
+        <div className="notice warn">
+          <strong>{upload.fileName}</strong>
+          <p className="error">{upload.message}</p>
+        </div>
+      )}
       {upload.status === 'unsupported' && (
         <div className="notice warn">
           <strong>{upload.fileName}</strong>
@@ -145,17 +197,18 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
       {docs && docs.length === 0 && <p className="hint">아직 추가한 PDF가 없습니다.</p>}
       <ul className="doc-list">
         {docs?.map((d) => (
-          <li key={d.id}>
-            <div>
-              <div className="doc-name">{d.name}</div>
-              <div className="doc-stats">
-                카드 {d.cardCount}장 · 복습 {d.summary.due} · 새 카드 {d.summary.newAvailable}
-              </div>
+          <li key={d.id} className="doc-item">
+            <p className="doc-name">{d.name}</p>
+            <div className="doc-stats">
+              <span>카드 <b>{d.cardCount}</b></span>
+              <span>복습 <b>{d.summary.due}</b></span>
+              <span>새 카드 <b>{d.summary.newAvailable}</b></span>
+              <span>{d.numPages}쪽</span>
             </div>
             <div className="row-actions">
-              <button disabled={d.summary.due + d.summary.newAvailable === 0} onClick={() => onStudy(d.id)}>학습</button>
+              <button className="primary" disabled={d.summary.due + d.summary.newAvailable === 0} onClick={() => onStudy(d.id)}>학습</button>
               <button onClick={() => onOpenDocument(d.id)}>카드 보기</button>
-              <button className="danger" onClick={() => onDelete(d)}>삭제</button>
+              <button className="quiet danger" onClick={() => onDelete(d)}>삭제</button>
             </div>
           </li>
         ))}

@@ -39,18 +39,24 @@ export function StudyView({ documentId, onExit }: Props) {
     [card],
   );
 
+  const remaining = queue?.length ?? 0;
+  const percent = done + remaining > 0 ? (100 * done) / (done + remaining) : 0;
+
   return (
     <main>
-      <header className="bar">
+      <div className="study-top">
         <button className="link" onClick={onExit}>← 홈</button>
-        {queue && <span>남은 카드 {queue.length} · 복습 {done}회</span>}
-      </header>
+        {queue && <span className="study-count">남은 카드 {remaining} · 복습 {done}회</span>}
+      </div>
+      <div className="study-progress" aria-hidden>
+        <div style={{ width: `${percent}%` }} />
+      </div>
       {!queue && <p className="empty">불러오는 중...</p>}
       {queue && card && <StudyCard key={card.id} card={card} intervals={intervals} onGrade={onGrade} />}
       {queue && !card && (
         <div className="empty">
           <p>{done > 0 ? '오늘 학습을 마쳤습니다.' : '지금 학습할 카드가 없습니다.'}</p>
-          <button onClick={onExit}>홈으로</button>
+          <button className="primary" onClick={onExit}>홈으로</button>
         </div>
       )}
     </main>

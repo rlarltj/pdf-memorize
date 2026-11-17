@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { blank, keyLetterHint, type CardContent } from '../lib/cards/cards';
+import { keyLetterHint, type CardContent } from '../lib/cards/cards';
 import { GRADES, type Grade } from '../lib/cards/grades';
 
 interface Props {
@@ -30,37 +30,47 @@ export function StudyCard({ card, intervals, onGrade }: Props) {
   }, [revealed, onGrade]);
 
   return (
-    <div className="study-card">
+    <article className="study-card">
       <div className="study-meta">
-        <span>p.{card.page}</span>
-        <span>{card.type === 'cloze' ? '빈칸 채우기' : '두문자'}</span>
+        <span className="tag">{card.type === 'cloze' ? '빈칸' : '두문자'}</span>
+        <span>{card.page}쪽</span>
       </div>
 
       {card.type === 'cloze' ? (
         <p className="study-question">
-          {card.before} {revealed ? <mark className="answer">{card.answer}</mark> : <span className="blank">{blank(card.answer)}</span>} {card.after}
+          <span className="context">{card.before}</span>{' '}
+          {revealed ? <mark className="answer">{card.answer}</mark> : <span className="blank" aria-label="빈칸">{' '.repeat(8)}</span>}{' '}
+          <span className="context">{card.after}</span>
         </p>
       ) : (
         <div className="study-question">
-          <p className="key-hint">{keyLetterHint(card.keyLetters)}</p>
-          {revealed && <p><mark className="answer">{card.answer}</mark></p>}
+          <div className="key-caption">이 두문자가 가리키는 문구는?</div>
+          <div className="key-hint">{keyLetterHint(card.keyLetters)}</div>
+          {revealed && (
+            <p>
+              <mark className="answer">{card.answer}</mark>
+            </p>
+          )}
         </div>
       )}
 
       {revealed && card.mnemonic && <p className="mnemonic">원문 두문자 [{card.mnemonic}]</p>}
 
-      {revealed ? (
-        <div className="grades">
-          {GRADES.map((g) => (
-            <button key={g.grade} className={`grade ${g.className}`} onClick={() => onGrade(g.grade)}>
-              <span>{g.label}</span>
-              {intervals?.[g.grade] && <small>{intervals[g.grade]}</small>}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <button className="primary reveal" onClick={() => setRevealed(true)}>정답 보기</button>
-      )}
-    </div>
+      <div className="study-actions">
+        {revealed ? (
+          <div className="grades">
+            {GRADES.map((g) => (
+              <button key={g.grade} className={`grade ${g.className}`} onClick={() => onGrade(g.grade)}>
+                <span>{g.label}</span>
+                {intervals?.[g.grade] && <small>{intervals[g.grade]}</small>}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button className="primary reveal" onClick={() => setRevealed(true)}>정답 보기</button>
+        )}
+        <p className="kbd-hint">{revealed ? '키보드 1 · 2 · 3 · 4' : '키보드 Space'}</p>
+      </div>
+    </article>
   );
 }

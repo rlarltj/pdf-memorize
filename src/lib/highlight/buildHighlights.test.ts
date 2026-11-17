@@ -80,6 +80,15 @@ describe('buildHighlights', () => {
     expect(hs.map((h) => h.mnemonic)).toEqual([undefined, '근사']);
   });
 
+  it('길이로 잘린 문맥은 단어 경계에서 자르고 말줄임표를 붙인다', () => {
+    const long = '가나다 '.repeat(30);
+    const [h] = build(`${long}{근본정신} ${long}`);
+    expect(h.before.startsWith('…')).toBe(true);
+    expect(h.before.slice(1).trim().split(' ')[0]).toBe('가나다');
+    expect(h.after.endsWith('…')).toBe(true);
+    expect(h.after.slice(0, -1).trim().split(' ').at(-1)).toBe('가나다');
+  });
+
   it('판례 번호가 많은 목차 페이지는 표시해 둔다', () => {
     const rows = Array.from({ length: 10 }, (_, i) => `${i + 1} {주제${i}} 20${10 + i}다${12345 + i}`).join('|');
     expect(build(rows).every((h) => h.onIndexPage)).toBe(true);

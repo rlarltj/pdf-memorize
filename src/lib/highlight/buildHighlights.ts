@@ -199,15 +199,30 @@ const clean = (t: string) => t.replace(/\s+/g, ' ').trim();
 
 /** 같은 문장 안의 앞 문맥. 마침표·괄호 두문자 뒤에서 자른다. */
 function contextBefore(s: string, start: number): string {
-  const raw = s.slice(Math.max(0, start - CONTEXT), start);
+  const from = Math.max(0, start - CONTEXT);
+  const raw = s.slice(from, start);
   const cut = Math.max(raw.lastIndexOf('. '), raw.lastIndexOf('.\n'), raw.lastIndexOf(']'));
-  return clean(cut >= 0 ? raw.slice(cut + 1) : raw).replace(/^\.\s*/, '');
+  if (cut >= 0) return clean(raw.slice(cut + 1)).replace(/^\.\s*/, '');
+  // 길이로 잘렸으면 단어 중간에서 시작하지 않도록 첫 공백까지 버리고 말줄임표를 붙인다
+  if (from > 0 && !/\s/.test(s[from - 1])) {
+    const firstSpace = raw.search(/\s/);
+    return firstSpace >= 0 ? `…${clean(raw.slice(firstSpace))}` : '';
+  }
+  return (from > 0 ? '…' : '') + clean(raw);
 }
 
 /** 같은 문장 안의 뒷 문맥. 두문자 괄호는 답을 드러내므로 뺀다. */
 function contextAfter(s: string, end: number): string {
   let raw = s.slice(end, end + CONTEXT);
   const stop = raw.search(/\.(\s|$)|\[/);
-  if (stop >= 0) raw = raw.slice(0, stop + (raw[stop] === '.' ? 1 : 0));
+  if (stop >= 0) return clean(raw.slice(0, stop + (raw[stop] === '.' ? 1 : 0)));
+  if (end + CONTEXT < s.length) {
+    // 길이로 잘렸으면 마지막 단어를 버리고 말줄임표
+    if (!/\s/.test(s[end + CONTEXT])) {
+      const lastSpace = raw.search(/\s\S*$/);
+      raw = lastSpace >= 0 ? raw.slice(0, lastSpace) : '';
+    }
+    return raw.trim() ? `${clean(raw)}…` : '';
+  }
   return clean(raw);
 }
