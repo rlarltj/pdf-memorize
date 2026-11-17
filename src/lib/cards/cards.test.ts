@@ -3,7 +3,7 @@ import type { Highlight } from '../highlight/buildHighlights';
 import { blank, cardsFromHighlights, keyLetterHint } from './cards';
 
 const h = (over: Partial<Highlight>): Highlight => ({
-  id: '1-0', page: 1, text: '문구', colors: [], keyLetters: '', before: '', after: '', boxes: [], ...over,
+  id: '1-0', page: 1, text: '문구', colors: [], mainColor: '', keyLetters: '', before: '', after: '', boxes: [], ...over,
 });
 
 describe('cardsFromHighlights', () => {

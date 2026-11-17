@@ -191,19 +191,24 @@ mark.answer { background: linear-gradient(transparent 12%, var(--mark) 12%, var(
 /* ---------- 원문 보기 ---------- */
 /* 원문은 데스크톱 화면 폭을 쓴다. 배율은 .pdf-pages 폭으로 조절하고 넘치면 가로 스크롤 */
 main.page-view { max-width: none; padding-left: 24px; padding-right: 24px; }
-main.page-view > .page-toolbar, main.page-view > .brand, main.page-view > .page-help, main.page-view > .notice { max-width: 1100px; margin-left: auto; margin-right: auto; }
+main.page-view > .page-sticky, main.page-view > .brand, main.page-view > .notice { max-width: 1100px; margin-left: auto; margin-right: auto; }
 .pdf-scroll { overflow-x: auto; padding-bottom: 8px; }
 .pdf-pages { margin: 0 auto; }
 .zoom { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .zoom button { font-size: 15px; min-width: 32px; }
 .zoom .zoom-label { font-size: 13px; min-width: 64px; font-variant-numeric: tabular-nums; }
 .zoom .zoom-label.on { color: var(--accent); font-weight: 600; }
-.page-toolbar {
-  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px;
-  padding: 8px 0; margin: -8px 0 4px; background: var(--bg);
-}
+.page-sticky { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+.page-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
 .page-toolbar .filters { margin: 0; }
-.page-help { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 13px; min-height: 32px; margin-bottom: 12px; }
+.blank-panel { display: grid; gap: 4px; }
+.color-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.panel-label { font-size: 13px; color: var(--muted); margin-right: 2px; }
+.color-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; font-size: 13px; border-radius: 999px; color: var(--muted); opacity: 0.55; font-variant-numeric: tabular-nums; }
+.color-chip.on { opacity: 1; color: var(--text); border-color: var(--text-soft); }
+.color-chip .swatch { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.15); display: inline-block; }
+kbd { font-family: var(--sans); font-size: 11px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface); color: var(--text-soft); }
+.page-help { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 13px; min-height: 28px; }
 .pdf-pages { display: grid; gap: 20px; }
 .pdf-page-sheet { position: relative; width: 100%; background: #fff; border-radius: 4px; box-shadow: var(--shadow); overflow: hidden; }
 .pdf-page-sheet canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -217,6 +222,7 @@ main.page-view > .page-toolbar, main.page-view > .brand, main.page-view > .page-
 .mask-box.edit-blank { background: repeating-linear-gradient(135deg, rgba(47, 90, 115, 0.28) 0 6px, rgba(47, 90, 115, 0.12) 6px 12px); box-shadow: inset 0 0 0 1.5px rgba(47, 90, 115, 0.8); }
 .mask-box.edit-shown { box-shadow: inset 0 0 0 1.5px rgba(138, 128, 119, 0.7); background: transparent; }
 .mask-box.edit-shown:hover, .mask-box.edit-blank:hover { box-shadow: inset 0 0 0 2px #2f5a73; }
+.mask-box.current { box-shadow: 0 0 0 2px #2f5a73, inset 0 -2px 0 rgba(47, 90, 115, 0.45); }
 .mask-box:focus-visible { outline: 2px solid #2f5a73; outline-offset: 1px; }
 
 /* ---------- 로그인 바 (Supabase 설정 시) ---------- */

@@ -42,12 +42,17 @@ export interface StoredFile {
 }
 
 /**
- * 원문 보기의 빈칸 설정. 기본은 모든 하이라이트가 빈칸이고, 사용자가 빈칸에서 뺀 것만 기록한다.
+ * 원문 보기의 빈칸 설정. 색 단위로 정하고, 하이라이트 단위로 예외를 둔다 (판정은 lib/blanks).
  * 키는 highlightKey (`${page}:${문구 해시}`)
  */
 export interface BlankSettings {
   documentId: string;
+  /** 빈칸으로 쓸 하이라이트 대표 색. 없으면 모든 색 */
+  colors?: string[];
+  /** 색과 관계없이 빈칸에서 뺀 하이라이트 */
   excluded: string[];
+  /** 색과 관계없이 빈칸으로 넣은 하이라이트 */
+  included?: string[];
   updatedAt: Date;
 }
 

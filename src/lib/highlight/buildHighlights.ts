@@ -19,6 +19,8 @@ export interface Highlight {
   text: string;
   /** 문구에 쓰인 배경색 (r,g,b) */
   colors: string[];
+  /** 가장 많은 글자를 칠한 색. 파란 문구 + 노란 두문자면 파랑. 원문 보기의 색별 빈칸 기준 */
+  mainColor: string;
   /** 문구 안에서 노란색으로 칠한 글자 (두문자 표시) */
   keyLetters: string;
   /** 문구 뒤에 적힌 두문자 원문. 예: "인조운독", "재회명독/별사취할" */
@@ -74,18 +76,20 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
 
   const spans = joinSingles(rawSpans(s, colorAt), s);
   const infos = spans.map((sp) => {
-    const colors = new Set<string>();
+    const colorCount = new Map<string, number>();
     let keyLetters = '';
     for (let k = sp.start; k < sp.end; k++) {
       const c = colorAt[k];
-      if (!c) continue;
-      colors.add(c);
-      if (c === KEY_LETTER_COLOR && !isSpace(s[k])) keyLetters += s[k];
+      if (!c || isSpace(s[k])) continue;
+      colorCount.set(c, (colorCount.get(c) ?? 0) + 1);
+      if (c === KEY_LETTER_COLOR) keyLetters += s[k];
     }
+    const colors = [...colorCount.keys()];
+    const mainColor = [...colorCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
     const text = clean(s.slice(sp.start, sp.end));
     // 문구 전체가 노란색이면 두문자 표시가 아니라 그냥 노란 형광펜이다
     if (keyLetters === text.replace(/\s/g, '')) keyLetters = '';
-    return { ...sp, text, colors: [...colors], keyLetters };
+    return { ...sp, text, colors, mainColor, keyLetters };
   });
   const mnemonics = findMnemonics(infos, s, colorAt);
   const onIndexPage = (s.match(CASE_NUMBER)?.length ?? 0) >= INDEX_PAGE_CASE_NUMBERS;
@@ -95,6 +99,7 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
     page,
     text: sp.text,
     colors: sp.colors,
+    mainColor: sp.mainColor,
     keyLetters: sp.keyLetters,
     mnemonic: mnemonics.get(i),
     before: contextBefore(s, sp.start),

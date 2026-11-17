@@ -30,12 +30,14 @@ describe('buildHighlights', () => {
   it('문구 배경 위의 노란 글자를 두문자로 기록하고 뒤 괄호를 두문자 원문으로 붙인다', () => {
     const [h] = build('사용자가 {<취>업<규>칙을 근로자에게 <불>리하게 <변>경}하면서 [취규불변]');
     expect(h).toMatchObject({ text: '취업규칙을 근로자에게 불리하게 변경', keyLetters: '취규불변', mnemonic: '취규불변' });
+    // 노란 두문자 4글자보다 파란 글자가 많으므로 대표 색은 파랑
+    expect(h.mainColor).toBe(BLUE);
   });
 
   it('첫 글자만 칠한 단어들은 한 문구로 묶고 양 끝을 단어 경계까지 넓힌다', () => {
     const hs = build('위 변경에 <사>회<통>념상 <합>리성이 있다는 이유<만>으로 그 유효성을 [사통합만]');
     expect(hs).toHaveLength(1);
-    expect(hs[0]).toMatchObject({ text: '사회통념상 합리성이 있다는 이유만으로', keyLetters: '사통합만', mnemonic: '사통합만' });
+    expect(hs[0]).toMatchObject({ text: '사회통념상 합리성이 있다는 이유만으로', keyLetters: '사통합만', mnemonic: '사통합만', mainColor: KEY_LETTER_COLOR });
   });
 
   it('칠하지 않은 공백 양쪽이 모두 두문자면 별개 구간으로 보고 묶은 뒤 단어 끝까지 넓힌다', () => {

@@ -3,7 +3,7 @@ import { describeLoadError, diagnose } from './diagnose';
 import type { ExtractResult } from './extractHighlights';
 import type { Highlight } from './buildHighlights';
 
-const hl: Highlight = { id: '1-0', page: 1, text: '문구', colors: [], keyLetters: '', before: '', after: '', boxes: [] };
+const hl: Highlight = { id: '1-0', page: 1, text: '문구', colors: [], mainColor: '', keyLetters: '', before: '', after: '', boxes: [] };
 const createSampleResult = (over: Partial<ExtractResult> = {}): ExtractResult => ({
   numPages: 1, annotationCount: 0, textChars: 1000, brokenChars: 0, highlights: [hl], ...over,
 });

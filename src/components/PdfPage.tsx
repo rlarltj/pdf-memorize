@@ -1,5 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
+import { isBlank } from '../lib/blanks/blanks';
 import { highlightKey } from '../lib/cards/cards';
+import type { BlankSettings } from '../lib/store/types';
 import type { Highlight } from '../lib/highlight/buildHighlights';
 import type { PdfDocument } from '../lib/highlight/extractHighlights';
 
@@ -11,17 +13,20 @@ interface Props {
   /** 한 페이지의 하이라이트를 계산한다 (부모가 페이지별로 캐시) */
   loadHighlights: (page: number) => Promise<Highlight[]>;
   mode: ViewMode;
-  /** 빈칸에서 뺀 하이라이트 키 */
-  excluded: Set<string>;
-  /** 암기 모드에서 잠깐 펼쳐 본 빈칸 */
+  /** 색별·하이라이트별 빈칸 설정 */
+  settings: BlankSettings;
+  /** 암기 모드에서 펼쳐 본 빈칸 */
   revealed: Set<string>;
-  onToggleBlank: (key: string) => void;
+  /** 마지막으로 펼친 빈칸 (Enter로 이어서 펼칠 때 위치 표시) */
+  currentKey?: string;
+  onToggleBlank: (key: string, mainColor: string) => void;
   onToggleReveal: (key: string) => void;
 }
 
 interface Overlay {
   key: string;
   text: string;
+  mainColor: string;
   /** 페이지 대비 비율(%) */
   rects: { left: number; top: number; width: number; height: number }[];
 }
@@ -31,7 +36,7 @@ const NEAR = '800px 0px';
 // 글자 영역보다 조금 넓게 가려 글자 끝이 비치지 않게 한다 (PDF 포인트 단위)
 const PAD = 1.2;
 
-function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed, onToggleBlank, onToggleReveal }: Props) {
+function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, settings, revealed, currentKey, onToggleBlank, onToggleReveal }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [near, setNear] = useState(false);
@@ -79,6 +84,7 @@ function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed
         highlights.map((h) => ({
           key: highlightKey(h),
           text: h.text,
+          mainColor: h.mainColor,
           rects: h.boxes.map((b) => {
             const [x1, y1, x2, y2] = vp.convertToViewportRectangle([b.x0 - PAD, b.y0 - PAD, b.x1 + PAD, b.y1 + PAD]);
             return {
@@ -131,17 +137,18 @@ function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed
       <div ref={wrapRef} className="pdf-page-sheet" style={{ aspectRatio: `1 / ${aspect}` }}>
         <canvas ref={canvasRef} />
         {overlays?.map((o) => {
-          const isBlank = !excluded.has(o.key);
-          if (mode === 'study' && !isBlank) return null;
+          const blank = isBlank(settings, o.key, o.mainColor);
+          if (mode === 'study' && !blank) return null;
           const state =
-            mode === 'edit' ? (isBlank ? 'edit-blank' : 'edit-shown') : revealed.has(o.key) ? 'peek' : 'mask';
+            (mode === 'edit' ? (blank ? 'edit-blank' : 'edit-shown') : revealed.has(o.key) ? 'peek' : 'mask') +
+            (mode === 'study' && o.key === currentKey ? ' current' : '');
           const label =
             mode === 'edit'
-              ? `${isBlank ? '빈칸' : '빈칸 아님'}: ${o.text}. 눌러서 ${isBlank ? '빈칸에서 빼기' : '빈칸으로 만들기'}`
+              ? `${blank ? '빈칸' : '빈칸 아님'}: ${o.text}. 눌러서 ${blank ? '빈칸에서 빼기' : '빈칸으로 만들기'}`
               : state === 'mask'
                 ? '가린 문구. 눌러서 보기'
                 : `${o.text}. 눌러서 다시 가리기`;
-          const onClick = () => (mode === 'edit' ? onToggleBlank(o.key) : onToggleReveal(o.key));
+          const onClick = () => (mode === 'edit' ? onToggleBlank(o.key, o.mainColor) : onToggleReveal(o.key));
           return o.rects.map((r, i) => (
             <button
               key={`${o.key}-${i}`}
@@ -149,6 +156,7 @@ function PdfPageImpl({ doc, pageNumber, loadHighlights, mode, excluded, revealed
               style={{ left: `${r.left}%`, top: `${r.top}%`, width: `${r.width}%`, height: `${r.height}%` }}
               aria-label={i === 0 ? label : undefined}
               aria-hidden={i === 0 ? undefined : true}
+              data-key={o.key}
               tabIndex={i === 0 ? 0 : -1}
               onClick={onClick}
             />
