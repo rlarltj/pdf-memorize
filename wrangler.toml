@@ -3,6 +3,10 @@
 # 배포: npm run deploy (로컬) 또는 main push 시 GitHub Actions
 name = "pdf-memorize"
 compatibility_date = "2026-11-01"
+# https://pdf-memorize.pdf-memorize.workers.dev
+workers_dev = true
+# 버전별 미리보기 주소는 쓰지 않는다
+preview_urls = false
 
 [assets]
 directory = "./dist"

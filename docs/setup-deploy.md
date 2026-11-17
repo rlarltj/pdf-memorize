@@ -6,7 +6,7 @@ Cloudflare Pages가 Workers로 통합되어 새 wrangler는 Pages 프로젝트 �
 ## 구조
 
 - `wrangler.toml`: 이름 `pdf-memorize`, `[assets] directory = "./dist"`, SPA 404 처리
-- 주소: `https://pdf-memorize.<계정 서브도메인>.workers.dev`
+- 주소: https://pdf-memorize.pdf-memorize.workers.dev
 - 로컬 배포: `npm run deploy`. 처음 한 번 `npx wrangler login`. Node 22 이상 필요
 - 자동 배포: main push → `check` 통과 → `deploy` 잡. 아래 Secrets가 없으면 배포 단계만 건너뜀
 

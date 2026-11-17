@@ -1,6 +1,7 @@
 # pdf-memorize
 
 PDF에서 하이라이트한 부분을 뽑아 암기 카드로 학습하게 돕는 웹 서비스. 1인 개발 개인 프로젝트.
+배포 주소: https://pdf-memorize.pdf-memorize.workers.dev
 이 파일이 AI 에이전트용 문서의 정본이다. `CLAUDE.md`는 이 파일을 import만 한다.
 
 ## 현재 상태
