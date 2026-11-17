@@ -52,9 +52,7 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
   }
 
   const spans = joinSingles(rawSpans(s, colorAt), s);
-  const mnemonics = findMnemonics(spans, s, colorAt);
-
-  return spans.map((sp, i) => {
+  const infos = spans.map((sp) => {
     const colors = new Set<string>();
     let keyLetters = '';
     for (let k = sp.start; k < sp.end; k++) {
@@ -66,17 +64,20 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
     const text = clean(s.slice(sp.start, sp.end));
     // 문구 전체가 노란색이면 두문자 표시가 아니라 그냥 노란 형광펜이다
     if (keyLetters === text.replace(/\s/g, '')) keyLetters = '';
-    return {
-      id: `${page}-${i}`,
-      page,
-      text,
-      colors: [...colors],
-      keyLetters,
-      mnemonic: mnemonics.get(i),
-      before: contextBefore(s, sp.start),
-      after: contextAfter(s, sp.end),
-    };
-  }).filter((h) => h.text.length > 0);
+    return { ...sp, text, colors: [...colors], keyLetters };
+  });
+  const mnemonics = findMnemonics(infos, s, colorAt);
+
+  return infos.map((sp, i) => ({
+    id: `${page}-${i}`,
+    page,
+    text: sp.text,
+    colors: sp.colors,
+    keyLetters: sp.keyLetters,
+    mnemonic: mnemonics.get(i),
+    before: contextBefore(s, sp.start),
+    after: contextAfter(s, sp.end),
+  })).filter((h) => h.text.length > 0);
 }
 
 /**
@@ -148,9 +149,12 @@ function widen(sp: Span & { shortStart: boolean; shortEnd: boolean }, s: string)
 
 /**
  * 문구 뒤의 "[인조운독]" 같은 괄호를 두문자 원문으로 본다.
- * 괄호 하나가 앞쪽 여러 문구를 설명하므로(예: "[재회명독/별사취할]"), 이전 괄호 이후의 가까운 문구 모두에 붙인다.
+ * 괄호 하나가 앞쪽 여러 문구를 설명하므로(예: "[재회명독/별사취할]") 이전 괄호 이후의 가까운 문구 중에서 고른다.
+ * - 노란 두문자가 있고 그 글자의 절반 이상이 괄호 안에 있는 문구에만 붙인다.
+ *   모두 붙이면 "근기법 §31", "<부당해고구제 재심판정>" 같은 무관한 문구에도 붙는다 (2026-11-18, D3)
+ * - 그런 문구가 없으면 바로 앞 문구 하나에만 붙인다
  */
-function findMnemonics(spans: Span[], s: string, colorAt: (string | undefined)[]): Map<number, string> {
+function findMnemonics(spans: (Span & { keyLetters: string })[], s: string, colorAt: (string | undefined)[]): Map<number, string> {
   const result = new Map<number, string>();
   let lastBracketEnd = 0;
   for (let i = 0; i < spans.length; i++) {
@@ -165,13 +169,23 @@ function findMnemonics(spans: Span[], s: string, colorAt: (string | undefined)[]
     const mnemonic = m[2].replace(/\s/g, '');
     // 두문자는 한글 글자를 '/'로 나눈 형태만 인정. "[12번]", "[판례 3]" 같은 번호 표기는 제외 (2026-11-18 브라우저 확인 중 발견)
     if (!MNEMONIC_SHAPE.test(mnemonic)) continue;
+
+    const candidates: number[] = [];
     for (let k = i; k >= 0; k--) {
       if (spans[k].start < lastBracketEnd || bracketStart - spans[k].start > MNEMONIC_LOOKBEHIND) break;
-      if (!result.has(k)) result.set(k, mnemonic);
+      if (!result.has(k)) candidates.push(k);
     }
+    const matching = candidates.filter((k) => keyLettersMatch(spans[k].keyLetters, mnemonic));
+    for (const k of matching.length > 0 ? matching : candidates.slice(0, 1)) result.set(k, mnemonic);
     lastBracketEnd = bracketStart + m[0].length - m[1].length;
   }
   return result;
+}
+
+function keyLettersMatch(keyLetters: string, mnemonic: string): boolean {
+  if (!keyLetters) return false;
+  const inside = [...keyLetters].filter((ch) => mnemonic.includes(ch)).length;
+  return inside * 2 >= keyLetters.length;
 }
 
 const clean = (t: string) => t.replace(/\s+/g, ' ').trim();

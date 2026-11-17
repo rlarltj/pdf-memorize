@@ -66,6 +66,20 @@ describe('buildHighlights', () => {
     expect(hs.map((h) => h.mnemonic)).toEqual(['가다', '마사']);
   });
 
+  it('두문자가 없는 무관한 문구에는 괄호를 붙이지 않는다', () => {
+    const hs = build('{근기법 §31}에 따라 {<재>심판정}을 다투며 {<사>용자가 <부>담} [사부]');
+    expect(hs.map((h) => [h.text, h.mnemonic])).toEqual([
+      ['근기법 §31', undefined],
+      ['재심판정', undefined],
+      ['사용자가 부담', '사부'],
+    ]);
+  });
+
+  it('두문자가 있는 문구가 없으면 바로 앞 문구 하나에만 붙인다', () => {
+    const hs = build('{근로자} 그리고 {사용자} [근사]');
+    expect(hs.map((h) => h.mnemonic)).toEqual([undefined, '근사']);
+  });
+
   it('번호 같은 괄호는 두문자로 보지 않는다', () => {
     expect(build('26 {직장폐쇄의 정당성} [12번]')[0].mnemonic).toBeUndefined();
     expect(build('{<근>로<자>성} [판례 3]')[0].mnemonic).toBeUndefined();
