@@ -22,6 +22,7 @@ describe.skipIf(!existsSync(SAMPLE))('실제 샘플 PDF', () => {
     expect(r.numPages).toBe(40);
     expect(r.annotationCount).toBe(0);
     expect(r.textChars).toBeGreaterThan(40_000);
+    expect(r.brokenChars / r.textChars).toBeLessThan(0.01);
   });
 
   it('2페이지: 문구 배경 + 두문자 + 괄호 원문', () => {

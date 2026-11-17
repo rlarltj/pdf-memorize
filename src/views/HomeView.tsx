@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { cardsFromHighlights } from '../lib/cards/cards';
 import { sha256 } from '../lib/fileHash';
 import { extractHighlights } from '../lib/highlight/extractHighlights';
+import { describeLoadError, diagnose } from '../lib/highlight/diagnose';
 import { startOfDay, summarize, type DailySummary } from '../lib/srs/session';
 import { store, type DocumentRecord, type ImportResult } from '../lib/store';
 
@@ -19,7 +20,8 @@ type UploadState =
   | { status: 'idle' }
   | { status: 'working'; fileName: string }
   | { status: 'done'; fileName: string; result: ImportResult }
-  | { status: 'error'; fileName: string; message: string };
+  | { status: 'error'; fileName: string; message: string }
+  | { status: 'unsupported'; fileName: string; message: string };
 
 export function HomeView({ onStudy, onOpenDocument }: Props) {
   const [docs, setDocs] = useState<DocRow[] | null>(null);
@@ -49,7 +51,18 @@ export function HomeView({ onStudy, onOpenDocument }: Props) {
       const buf = await file.arrayBuffer();
       // pdf.js가 버퍼를 워커로 넘기며 비울 수 있어 해시를 먼저 계산
       const id = await sha256(buf);
-      const extracted = await extractHighlights(buf);
+      let extracted;
+      try {
+        extracted = await extractHighlights(buf);
+      } catch (e) {
+        setUpload({ status: 'error', fileName: file.name, message: describeLoadError(e) });
+        return;
+      }
+      const diagnosis = diagnose(extracted);
+      if (!diagnosis.usable) {
+        setUpload({ status: 'unsupported', fileName: file.name, message: diagnosis.message ?? '' });
+        return;
+      }
       const cards = cardsFromHighlights(id, extracted.highlights);
       const result = await store.importDocument(
         { id, name: file.name, numPages: extracted.numPages, highlightCount: extracted.highlights.length },
@@ -99,6 +112,12 @@ export function HomeView({ onStudy, onOpenDocument }: Props) {
         </p>
       )}
       {upload.status === 'error' && <p className="error">{upload.fileName}: {upload.message}</p>}
+      {upload.status === 'unsupported' && (
+        <div className="notice warn">
+          <strong>{upload.fileName}</strong>
+          <p>{upload.message}</p>
+        </div>
+      )}
 
       <h2>문서</h2>
       {docs && docs.length === 0 && <p className="hint">아직 추가한 PDF가 없습니다.</p>}

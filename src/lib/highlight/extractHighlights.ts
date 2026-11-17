@@ -11,8 +11,13 @@ export interface ExtractResult {
   annotationCount: number;
   /** 추출된 전체 글자 수. 0이면 스캔본(이미지 PDF) */
   textChars: number;
+  /** 폰트 매핑이 깨졌을 때 나오는 글자(사용자 영역 U+E000~F8FF, U+FFFD, 제어 문자) 수 */
+  brokenChars: number;
   highlights: Highlight[];
 }
+
+// eslint-disable-next-line no-control-regex
+const BROKEN_CHAR = /[\uE000-\uF8FF\uFFFD\u0000-\u0008\u000E-\u001F]/g;
 
 type Matrix = [number, number, number, number, number, number];
 interface Rect { x0: number; y0: number; x1: number; y1: number; color: string }
@@ -132,14 +137,19 @@ export async function extractHighlights(file: ArrayBuffer): Promise<ExtractResul
   const highlights: Highlight[] = [];
   let annotationCount = 0;
   let textChars = 0;
+  let brokenChars = 0;
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     annotationCount += (await page.getAnnotations()).filter((a) => a.subtype === 'Highlight').length;
     const items = (await page.getTextContent()).items as TextItem[];
-    textChars += items.reduce((n, it) => n + (it.str?.trim().length ?? 0), 0);
+    for (const it of items) {
+      const str = it.str?.replace(/\s/g, '') ?? '';
+      textChars += str.length;
+      brokenChars += str.match(BROKEN_CHAR)?.length ?? 0;
+    }
     const rects = await collectFillRects(page);
     if (rects.length > 0) highlights.push(...buildHighlights(toPageChars(items, rects), p));
   }
   await doc.destroy();
-  return { numPages: doc.numPages, annotationCount, textChars, highlights };
+  return { numPages: doc.numPages, annotationCount, textChars, brokenChars, highlights };
 }
