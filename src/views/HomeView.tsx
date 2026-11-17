@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cardsFromHighlights } from '../lib/cards/cards';
 import { sha256 } from '../lib/fileHash';
-import { extractHighlights } from '../lib/highlight/extractHighlights';
+import { loadExtractor } from '../lib/highlight/loadExtractor';
+import type { ExtractResult } from '../lib/highlight/extractHighlights';
 import { describeLoadError, diagnose } from '../lib/highlight/diagnose';
 import { startOfDay, summarize, type DailySummary } from '../lib/srs/session';
 import { store, type DocumentRecord, type ImportResult } from '../lib/store';
@@ -21,7 +22,7 @@ interface DocRow extends DocumentRecord {
 
 type UploadState =
   | { status: 'idle' }
-  | { status: 'working'; fileName: string }
+  | { status: 'working'; fileName: string; done?: number; total?: number }
   | { status: 'done'; fileName: string; result: ImportResult }
   | { status: 'error'; fileName: string; message: string }
   | { status: 'unsupported'; fileName: string; message: string };
@@ -57,9 +58,10 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
       const buf = await file.arrayBuffer();
       // pdf.js가 버퍼를 워커로 넘기며 비울 수 있어 해시를 먼저 계산
       const id = await sha256(buf);
-      let extracted;
+      let extracted: ExtractResult;
       try {
-        extracted = await extractHighlights(buf);
+        const extractHighlights = await loadExtractor();
+        extracted = await extractHighlights(buf, (done, total) => setUpload({ status: 'working', fileName: file.name, done, total }));
       } catch (e) {
         setUpload({ status: 'error', fileName: file.name, message: describeLoadError(e) });
         return;
@@ -112,7 +114,11 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
 
       <h2>PDF 추가</h2>
       <input type="file" accept="application/pdf" onChange={(e) => onFile(e.target.files?.[0])} disabled={upload.status === 'working'} />
-      {upload.status === 'working' && <p>{upload.fileName} 분석 중...</p>}
+      {upload.status === 'working' && (
+        <p>
+          {upload.fileName} 분석 중{upload.total ? ` (${upload.done}/${upload.total}쪽)` : '...'}
+        </p>
+      )}
       {upload.status === 'done' && (
         <p>
           {upload.fileName}: 새 카드 {upload.result.added}장

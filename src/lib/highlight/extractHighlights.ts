@@ -161,7 +161,8 @@ function toPageChars(items: TextItem[], rects: Rect[]): PageChar[] {
   return chars;
 }
 
-export async function extractHighlights(file: ArrayBuffer): Promise<ExtractResult> {
+/** onProgress(처리한 페이지 수, 전체 페이지 수) */
+export async function extractHighlights(file: ArrayBuffer, onProgress?: (done: number, total: number) => void): Promise<ExtractResult> {
   const doc = await getDocument({ data: new Uint8Array(file), cMapPacked: true, ...pdfAssets }).promise;
   const highlights: Highlight[] = [];
   let annotationCount = 0;
@@ -180,6 +181,7 @@ export async function extractHighlights(file: ArrayBuffer): Promise<ExtractResul
     // 주석은 페이지 내용 위에 그려지므로 배경색 사각형 뒤에 붙여 겹칠 때 이기게 한다
     const rects = [...(await collectFillRects(page)), ...annotationRects(annotations)];
     if (rects.length > 0) highlights.push(...buildHighlights(toPageChars(items, rects), p));
+    onProgress?.(p, doc.numPages);
   }
   await doc.destroy();
   return { numPages: doc.numPages, annotationCount, textChars, brokenChars, highlights };
