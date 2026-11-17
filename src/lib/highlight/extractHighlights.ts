@@ -1,28 +1,21 @@
 import { getDocument, OPS } from 'pdfjs-dist';
 import type { PDFPageProxy } from 'pdfjs-dist';
 import type { TextItem } from 'pdfjs-dist/types/src/display/api';
+import { buildHighlights, type Highlight, type PageChar } from './buildHighlights';
 
-/**
- * 하이라이트 한 덩어리. 색이 달라도 붙어 있는 글자는 한 문구로 합친다.
- * keyLetters: 문구 안에서 노란색으로 따로 칠한 글자(두문자 암기 표시).
- */
-export interface Highlight {
-  page: number;
-  text: string;
-  colors: string[];
-  keyLetters: string;
-}
+export type { Highlight } from './buildHighlights';
 
 export interface ExtractResult {
   numPages: number;
+  /** PDF 뷰어 앱에서 칠한 Highlight 주석 개수 */
   annotationCount: number;
+  /** 추출된 전체 글자 수. 0이면 스캔본(이미지 PDF) */
+  textChars: number;
   highlights: Highlight[];
 }
 
 type Matrix = [number, number, number, number, number, number];
 interface Rect { x0: number; y0: number; x1: number; y1: number; color: string }
-
-const KEY_LETTER_COLOR = '255,255,0';
 
 const multiply = (m: Matrix, n: number[]): Matrix => [
   m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1],
@@ -31,16 +24,23 @@ const multiply = (m: Matrix, n: number[]): Matrix => [
 ];
 const apply = (m: Matrix, x: number, y: number) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 
-/** 글자색으로 쓰는 진한 색, 흰색, 회색(표 음영)은 제외하고 밝은 유채색만 하이라이트로 본다. */
-const isHighlightColor = ([r, g, b]: number[]) => {
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  return (r + g + b) / 3 > 150 && max - min > 20;
+/**
+ * 하이라이트 배경으로 볼 색.
+ * - 밝은 유채색: 형광펜
+ * - 중간 밝기 회색(약 190~235): 실제 자료에서 문구 음영으로 쓰임 (2026-11-18 샘플 15페이지 "[인조운독]" 문구)
+ * 흰색·아주 연한 회색(표 배경)과 진한 색(글자색, 제목 띠)은 제외한다.
+ */
+export const isHighlightColor = ([r, g, b]: number[]) => {
+  const avg = (r + g + b) / 3;
+  const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+  if (avg <= 150) return false;
+  if (chroma > 20) return true;
+  return avg >= 190 && avg <= 235;
 };
 
 /**
  * HWP/Word에서 형광펜·글자 음영을 넣고 PDF로 변환하면 주석이 아니라 글자 뒤에 색 사각형이 그려진다.
- * operator list를 따라가며 밝은 유채색으로 채운 경로의 bbox를 수집한다.
+ * operator list를 따라가며 하이라이트 색으로 채운 경로의 bbox를 수집한다.
  */
 async function collectFillRects(page: PDFPageProxy): Promise<Rect[]> {
   const ops = await page.getOperatorList();
@@ -108,15 +108,10 @@ function topmostColorAt(rects: Rect[], x: number, y: number): string | undefined
   return undefined;
 }
 
-async function extractFromPage(page: PDFPageProxy, pageNumber: number): Promise<Highlight[]> {
-  const rects = await collectFillRects(page);
-  if (rects.length === 0) return [];
-  const content = await page.getTextContent();
-
-  // 텍스트 아이템을 글자 단위로 나눠, 글자 중심점이 어느 색 사각형 안에 있는지 판정한다.
-  type Char = { ch: string; color?: string } | { eol: true };
-  const chars: Char[] = [];
-  for (const item of content.items as TextItem[]) {
+/** 텍스트 아이템을 글자 단위로 나눠 글자 중심점이 들어가는 사각형의 색을 붙인다. */
+function toPageChars(items: TextItem[], rects: Rect[]): PageChar[] {
+  const chars: PageChar[] = [];
+  for (const item of items) {
     if (item.str) {
       const [, , , d, e, f] = item.transform;
       const glyphs = [...item.str];
@@ -129,43 +124,22 @@ async function extractFromPage(page: PDFPageProxy, pageNumber: number): Promise<
     }
     if (item.hasEOL) chars.push({ eol: true });
   }
-
-  const result: Highlight[] = [];
-  let cur: { text: string; colors: Set<string>; keyLetters: string } | null = null;
-  const flush = () => {
-    if (!cur) return;
-    const text = cur.text.replace(/\s+/g, ' ').trim();
-    if (text) result.push({ page: pageNumber, text, colors: [...cur.colors], keyLetters: cur.keyLetters });
-    cur = null;
-  };
-  for (const c of chars) {
-    if ('eol' in c) {
-      if (cur) cur.text += ' ';
-    } else if (c.color) {
-      cur ??= { text: '', colors: new Set(), keyLetters: '' };
-      cur.text += c.ch;
-      cur.colors.add(c.color);
-      if (c.color === KEY_LETTER_COLOR) cur.keyLetters += c.ch;
-    } else if (cur && c.ch.trim() === '') {
-      cur.text += c.ch;
-    } else {
-      flush();
-    }
-  }
-  flush();
-  return result;
+  return chars;
 }
 
 export async function extractHighlights(file: ArrayBuffer): Promise<ExtractResult> {
   const doc = await getDocument({ data: new Uint8Array(file) }).promise;
   const highlights: Highlight[] = [];
   let annotationCount = 0;
+  let textChars = 0;
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
-    // PDF 뷰어 앱에서 칠한 Highlight 주석은 이번 범위가 아니지만, 존재 여부는 표시한다.
     annotationCount += (await page.getAnnotations()).filter((a) => a.subtype === 'Highlight').length;
-    highlights.push(...(await extractFromPage(page, p)));
+    const items = (await page.getTextContent()).items as TextItem[];
+    textChars += items.reduce((n, it) => n + (it.str?.trim().length ?? 0), 0);
+    const rects = await collectFillRects(page);
+    if (rects.length > 0) highlights.push(...buildHighlights(toPageChars(items, rects), p));
   }
   await doc.destroy();
-  return { numPages: doc.numPages, annotationCount, highlights };
+  return { numPages: doc.numPages, annotationCount, textChars, highlights };
 }

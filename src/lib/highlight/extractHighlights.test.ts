@@ -10,7 +10,8 @@ import { extractHighlights } from './extractHighlights';
 const SIZE = 12;
 const LIGHT_BLUE = rgb(192 / 255, 205 / 255, 239 / 255);
 const YELLOW = rgb(1, 1, 0);
-const GRAY = rgb(217 / 255, 217 / 255, 217 / 255);
+const MID_GRAY = rgb(217 / 255, 217 / 255, 217 / 255);
+const TABLE_GRAY = rgb(242 / 255, 242 / 255, 242 / 255);
 const RED = rgb(1, 0, 0);
 
 interface Mark { from: number; to: number; color: ReturnType<typeof rgb> }
@@ -76,9 +77,16 @@ describe('extractHighlights', () => {
     expect(texts(await extractHighlights(pdf))).toEqual(['ends here']);
   });
 
-  it('회색 음영(표 배경)과 진한 색 사각형은 하이라이트로 보지 않는다', async () => {
+  it('중간 밝기 회색 음영은 하이라이트로 본다', async () => {
     const pdf = await buildPdf((page, font) => {
-      line(page, font, 'table header', 700, [{ from: 0, to: 12, color: GRAY }]);
+      line(page, font, 'gray phrase here', 700, [{ from: 0, to: 11, color: MID_GRAY }]);
+    });
+    expect(texts(await extractHighlights(pdf))).toEqual(['gray phrase']);
+  });
+
+  it('아주 연한 회색(표 배경)과 진한 색 사각형은 하이라이트로 보지 않는다', async () => {
+    const pdf = await buildPdf((page, font) => {
+      line(page, font, 'table header', 700, [{ from: 0, to: 12, color: TABLE_GRAY }]);
       line(page, font, 'title bar', 650, [{ from: 0, to: 9, color: RED }]);
     });
     expect(texts(await extractHighlights(pdf))).toEqual([]);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { extractHighlights, type ExtractResult, type Highlight } from './lib/extractHighlights';
+import { extractHighlights, type ExtractResult, type Highlight } from './lib/highlight/extractHighlights';
 import './App.css';
 
 const rgb = (c: string) => `rgb(${c})`;
@@ -58,9 +58,8 @@ export default function App() {
                   <span key={c} className="swatch" style={{ background: rgb(c) }} />
                 ))}
                 <span className="text">{h.text}</span>
-                {h.keyLetters && h.keyLetters !== h.text.replace(/\s/g, '') && (
-                  <span className="keys">두문자: {h.keyLetters}</span>
-                )}
+                {h.keyLetters && <span className="keys">두문자: {h.keyLetters}</span>}
+                {h.mnemonic && <span className="keys">[{h.mnemonic}]</span>}
               </li>
             ))}
           </ol>
