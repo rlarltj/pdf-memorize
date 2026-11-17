@@ -37,12 +37,17 @@ function hash(text: string): string {
   return (h >>> 0).toString(36);
 }
 
+/** 하이라이트를 문서 안에서 가리키는 안정적인 키: `${page}:${문구 해시}`. 카드 id와 빈칸 설정이 같이 쓴다 */
+export function highlightKey(h: Pick<Highlight, 'page' | 'text'>): string {
+  return `${h.page}:${hash(h.text.replace(/\s/g, ''))}`;
+}
+
 export function cardsFromHighlights(documentId: string, highlights: Highlight[]): CardContent[] {
   const cards: CardContent[] = [];
   const seen = new Set<string>();
   for (const h of highlights) {
     if (h.text.replace(/\s/g, '').length < MIN_ANSWER_LENGTH) continue;
-    const key = `${documentId}:${h.page}:${hash(h.text.replace(/\s/g, ''))}`;
+    const key = `${documentId}:${highlightKey(h)}`;
     // 같은 페이지에 같은 문구가 두 번 칠해져 있으면 카드는 하나만
     if (seen.has(key)) continue;
     seen.add(key);

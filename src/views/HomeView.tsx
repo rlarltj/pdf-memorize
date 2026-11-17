@@ -16,6 +16,7 @@ interface Props {
   sync: SyncState;
   onStudy: (documentId?: string) => void;
   onOpenDocument: (documentId: string) => void;
+  onOpenPages: (documentId: string) => void;
 }
 
 interface DocRow extends DocumentRecord {
@@ -30,7 +31,7 @@ type UploadState =
   | { status: 'error'; fileName: string; message: string }
   | { status: 'unsupported'; fileName: string; message: string };
 
-export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
+export function HomeView({ sync, onStudy, onOpenDocument, onOpenPages }: Props) {
   const [docs, setDocs] = useState<DocRow[] | null>(null);
   const [total, setTotal] = useState<DailySummary | null>(null);
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
@@ -64,8 +65,9 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
     setUpload({ status: 'working', fileName: file.name });
     try {
       const buf = await file.arrayBuffer();
-      // pdf.js가 버퍼를 워커로 넘기며 비울 수 있어 해시를 먼저 계산
+      // pdf.js가 버퍼를 워커로 넘기며 비울 수 있어 해시와 원본 복사본을 먼저 만든다
       const id = await sha256(buf);
+      const original = buf.slice(0);
       let extracted: ExtractResult;
       try {
         const extractHighlights = await loadExtractor();
@@ -85,6 +87,8 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
         cards,
         new Date(),
       );
+      // 원문 보기용 원본. 이 브라우저에만 저장한다
+      await store.putFile(id, original);
       setUpload({ status: 'done', fileName: file.name, result });
       await refresh();
       void sync.syncNow();
@@ -207,7 +211,8 @@ export function HomeView({ sync, onStudy, onOpenDocument }: Props) {
             </div>
             <div className="row-actions">
               <button className="primary" disabled={d.summary.due + d.summary.newAvailable === 0} onClick={() => onStudy(d.id)}>학습</button>
-              <button onClick={() => onOpenDocument(d.id)}>카드 보기</button>
+              <button onClick={() => onOpenPages(d.id)}>원문</button>
+              <button onClick={() => onOpenDocument(d.id)}>카드</button>
               <button className="quiet danger" onClick={() => onDelete(d)}>삭제</button>
             </div>
           </li>

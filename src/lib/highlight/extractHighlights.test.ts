@@ -57,6 +57,21 @@ describe('extractHighlights', () => {
     expect(r.annotationCount).toBe(0);
   });
 
+  it('원문 위에 겹칠 문구 영역이 칠한 위치와 맞는다', async () => {
+    let charW = 0;
+    const pdf = await buildPdf((page, font) => {
+      charW = font.widthOfTextAtSize('M', SIZE);
+      line(page, font, 'the quick brown fox', 700, [{ from: 4, to: 15, color: LIGHT_BLUE }]);
+    });
+    const [h] = (await extractHighlights(pdf)).highlights;
+    expect(h.boxes).toHaveLength(1);
+    const [b] = h.boxes;
+    expect(b.x0).toBeCloseTo(50 + charW * 4, 0);
+    expect(b.x1).toBeCloseTo(50 + charW * 15, 0);
+    expect(b.y0).toBeLessThan(700);
+    expect(b.y1).toBeGreaterThan(700 + SIZE * 0.6);
+  });
+
   it('색이 달라도 붙어 있으면 한 문구로 합치고 노란 글자는 두문자로 기록한다', async () => {
     const pdf = await buildPdf((page, font) => {
       line(page, font, 'Apple Banana', 700, [

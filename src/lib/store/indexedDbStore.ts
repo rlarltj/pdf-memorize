@@ -1,7 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { newSchedule } from '../srs/scheduler';
 import type { CardContent } from '../cards/cards';
-import type { Deletion, DocumentRecord, ImportResult, RemoteChanges, ReviewRecord, StoredCard, StudyStore } from './types';
+import type { BlankSettings, Deletion, DocumentRecord, ImportResult, RemoteChanges, ReviewRecord, StoredCard, StoredFile, StudyStore } from './types';
 
 /** synced: 0=아직 원격에 안 올림, 1=올림. IndexedDB는 boolean을 인덱스로 못 써서 숫자 */
 type LocalReview = ReviewRecord & { synced: 0 | 1 };
@@ -12,6 +12,8 @@ interface Schema extends DBSchema {
   reviews: { key: string; value: LocalReview; indexes: { byReviewedAt: Date; byDocument: string; bySynced: number } };
   deletions: { key: string; value: Deletion };
   meta: { key: string; value: string };
+  files: { key: string; value: StoredFile };
+  blanks: { key: string; value: BlankSettings };
 }
 
 const deletionKey = (d: Pick<Deletion, 'kind' | 'id'>) => `${d.kind}:${d.id}`;
@@ -21,7 +23,7 @@ export class IndexedDbStore implements StudyStore {
   private db: Promise<IDBPDatabase<Schema>>;
 
   constructor(name = 'pdf-memorize') {
-    this.db = openDB<Schema>(name, 2, {
+    this.db = openDB<Schema>(name, 3, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('documents', { keyPath: 'id' });
@@ -36,6 +38,10 @@ export class IndexedDbStore implements StudyStore {
           reviews.createIndex('bySynced', 'synced');
           db.createObjectStore('deletions');
           db.createObjectStore('meta');
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('files', { keyPath: 'documentId' });
+          db.createObjectStore('blanks', { keyPath: 'documentId' });
         }
       },
     });
@@ -79,8 +85,10 @@ export class IndexedDbStore implements StudyStore {
 
   private async removeDocument(id: string) {
     const db = await this.db;
-    const tx = db.transaction(['documents', 'cards', 'reviews'], 'readwrite');
+    const tx = db.transaction(['documents', 'cards', 'reviews', 'files', 'blanks'], 'readwrite');
     await tx.objectStore('documents').delete(id);
+    await tx.objectStore('files').delete(id);
+    await tx.objectStore('blanks').delete(id);
     for (const key of await tx.objectStore('cards').index('byDocument').getAllKeys(id)) await tx.objectStore('cards').delete(key);
     for (const key of await tx.objectStore('reviews').index('byDocument').getAllKeys(id)) await tx.objectStore('reviews').delete(key);
     await tx.done;
@@ -107,6 +115,22 @@ export class IndexedDbStore implements StudyStore {
 
   async listReviewsSince(since: Date) {
     return (await (await this.db).getAllFromIndex('reviews', 'byReviewedAt', IDBKeyRange.lowerBound(since))).map(stripLocal);
+  }
+
+  async getFile(documentId: string) {
+    return (await this.db).get('files', documentId);
+  }
+
+  async putFile(documentId: string, data: ArrayBuffer) {
+    await (await this.db).put('files', { documentId, data, savedAt: new Date() });
+  }
+
+  async getBlankSettings(documentId: string) {
+    return (await (await this.db).get('blanks', documentId)) ?? { documentId, excluded: [], updatedAt: new Date(0) };
+  }
+
+  async putBlankSettings(settings: BlankSettings) {
+    await (await this.db).put('blanks', { ...settings, updatedAt: new Date() });
   }
 
   // --- 동기화용 ---

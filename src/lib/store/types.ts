@@ -34,6 +34,23 @@ export interface ReviewRecord {
   reviewedAt: Date;
 }
 
+/** 원본 PDF. 원문 보기용으로 이 브라우저에만 저장하고 동기화하지 않는다 (ADR pdf-client-side-only) */
+export interface StoredFile {
+  documentId: string;
+  data: ArrayBuffer;
+  savedAt: Date;
+}
+
+/**
+ * 원문 보기의 빈칸 설정. 기본은 모든 하이라이트가 빈칸이고, 사용자가 빈칸에서 뺀 것만 기록한다.
+ * 키는 highlightKey (`${page}:${문구 해시}`)
+ */
+export interface BlankSettings {
+  documentId: string;
+  excluded: string[];
+  updatedAt: Date;
+}
+
 export interface ImportResult {
   added: number;
   updated: number;
@@ -77,6 +94,11 @@ export interface StudyStore {
   deleteCard(id: string): Promise<void>;
   addReview(review: Omit<ReviewRecord, 'id'>): Promise<void>;
   listReviewsSince(since: Date): Promise<ReviewRecord[]>;
+
+  getFile(documentId: string): Promise<StoredFile | undefined>;
+  putFile(documentId: string, data: ArrayBuffer): Promise<void>;
+  getBlankSettings(documentId: string): Promise<BlankSettings>;
+  putBlankSettings(settings: BlankSettings): Promise<void>;
 
   // --- 동기화용 ---
   changedSince(since: Date): Promise<{ documents: DocumentRecord[]; cards: StoredCard[] }>;

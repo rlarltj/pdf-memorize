@@ -80,6 +80,26 @@ describe('buildHighlights', () => {
     expect(hs.map((h) => h.mnemonic)).toEqual([undefined, '근사']);
   });
 
+  it('문구 영역을 줄마다 하나로 합친다', () => {
+    // 1줄: "가나" (x 0~20), 2줄: "다" (x 0~10), 글자 폭 10, 줄 높이 10
+    const at = (x: number, y: number) => ({ x0: x, x1: x + 10, y0: y, y1: y + 10 });
+    const chars = [
+      { ch: '가', color: BLUE, box: at(0, 100) },
+      { ch: '나', color: BLUE, box: at(10, 100) },
+      { eol: true as const },
+      { ch: '다', color: BLUE, box: at(0, 80) },
+      { ch: '끝', box: at(10, 80) },
+    ];
+    const [h] = buildHighlights(chars, 1);
+    expect(h.text).toBe('가나 다');
+    expect(h.boxes).toEqual([{ x0: 0, x1: 20, y0: 100, y1: 110 }, at(0, 80)]);
+  });
+
+  it('BMP 밖 글자가 섞여도 색 위치가 어긋나지 않는다', () => {
+    const chars = [{ ch: '𝓐' }, { ch: '가', color: BLUE }, { ch: '나', color: BLUE }, { ch: '다' }];
+    expect(buildHighlights(chars, 1).map((h) => h.text)).toEqual(['가나']);
+  });
+
   it('길이로 잘린 문맥은 단어 경계에서 자르고 말줄임표를 붙인다', () => {
     const long = '가나다 '.repeat(30);
     const [h] = build(`${long}{근본정신} ${long}`);

@@ -51,4 +51,19 @@ describe('IndexedDbStore', () => {
     await store.addReview({ cardId: 'b', documentId: 'doc', grade: 3, previousState: 0, reviewedAt: NOW });
     expect((await store.listReviewsSince(new Date('2026-11-18T00:00:00'))).map((r) => r.cardId)).toEqual(['b']);
   });
+
+  it('원본 PDF와 빈칸 설정을 저장하고, 문서를 지우면 함께 지운다', async () => {
+    const store = freshStore();
+    await store.importDocument(doc, [createSampleContent('a')], NOW);
+    await store.putFile('doc', new Uint8Array([1, 2, 3]).buffer);
+    expect(await store.getBlankSettings('doc')).toMatchObject({ excluded: [] });
+    await store.putBlankSettings({ documentId: 'doc', excluded: ['2:abc'], updatedAt: NOW });
+
+    expect(new Uint8Array((await store.getFile('doc'))!.data)).toEqual(new Uint8Array([1, 2, 3]));
+    expect((await store.getBlankSettings('doc')).excluded).toEqual(['2:abc']);
+
+    await store.deleteDocument('doc');
+    expect(await store.getFile('doc')).toBeUndefined();
+    expect((await store.getBlankSettings('doc')).excluded).toEqual([]);
+  });
 });

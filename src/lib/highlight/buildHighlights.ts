@@ -2,7 +2,15 @@
  * 글자 단위 색 정보에서 하이라이트 문구를 만든다. PDF와 무관한 순수 로직이라 문자열로 바로 테스트할 수 있다.
  */
 
-export type PageChar = { ch: string; color?: string } | { eol: true };
+/** PDF 사용자 공간 좌표 (원점 왼쪽 아래, y가 위로 증가) */
+export interface Box {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export type PageChar = { ch: string; color?: string; box?: Box } | { eol: true };
 
 export interface Highlight {
   id: string;
@@ -18,6 +26,8 @@ export interface Highlight {
   /** 빈칸 카드용 앞뒤 문맥 (같은 문장 안) */
   before: string;
   after: string;
+  /** 원문 페이지에서 이 문구가 차지하는 영역. 줄마다 하나 */
+  boxes: Box[];
   /** 목차·판례 목록 같은 표 페이지. 앞뒤 문맥이 옆 칸 번호뿐이라 빈칸 카드로 쓸 수 없다 */
   onIndexPage?: boolean;
 }
@@ -46,13 +56,19 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
   // 줄바꿈을 '\n'으로 펼쳐 문자열과 같은 인덱스의 색 배열을 만든다
   let s = '';
   const colorAt: (string | undefined)[] = [];
+  const boxAt: (Box | undefined)[] = [];
   for (const c of chars) {
     if ('eol' in c) {
       s += '\n';
       colorAt.push(undefined);
+      boxAt.push(undefined);
     } else {
       s += c.ch;
-      colorAt.push(c.color);
+      // 문자열 인덱스와 맞추기 위해 UTF-16 단위 수만큼 넣는다 (BMP 밖 글자는 2칸)
+      for (let u = 0; u < c.ch.length; u++) {
+        colorAt.push(c.color);
+        boxAt.push(c.box);
+      }
     }
   }
 
@@ -83,6 +99,7 @@ export function buildHighlights(chars: PageChar[], page: number): Highlight[] {
     mnemonic: mnemonics.get(i),
     before: contextBefore(s, sp.start),
     after: contextAfter(s, sp.end),
+    boxes: lineBoxes(boxAt, s, sp.start, sp.end),
     ...(onIndexPage ? { onIndexPage } : {}),
   })).filter((h) => h.text.length > 0);
 }
@@ -193,6 +210,26 @@ function keyLettersMatch(keyLetters: string, mnemonic: string): boolean {
   if (!keyLetters) return false;
   const inside = [...keyLetters].filter((ch) => mnemonic.includes(ch)).length;
   return inside * 2 >= keyLetters.length;
+}
+
+/** 구간 글자들의 영역을 줄 단위로 합친다. 같은 줄 판정은 세로 중심이 글자 높이 절반 안에 있는지로 */
+function lineBoxes(boxAt: (Box | undefined)[], s: string, start: number, end: number): Box[] {
+  const lines: Box[] = [];
+  for (let k = start; k < end; k++) {
+    const b = boxAt[k];
+    if (!b || isSpace(s[k])) continue;
+    const mid = (b.y0 + b.y1) / 2;
+    const line = lines.find((l) => Math.abs((l.y0 + l.y1) / 2 - mid) < (b.y1 - b.y0) / 2);
+    if (line) {
+      line.x0 = Math.min(line.x0, b.x0);
+      line.x1 = Math.max(line.x1, b.x1);
+      line.y0 = Math.min(line.y0, b.y0);
+      line.y1 = Math.max(line.y1, b.y1);
+    } else {
+      lines.push({ ...b });
+    }
+  }
+  return lines;
 }
 
 const clean = (t: string) => t.replace(/\s+/g, ' ').trim();

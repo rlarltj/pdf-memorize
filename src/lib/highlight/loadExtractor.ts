@@ -5,3 +5,9 @@ export async function loadExtractor() {
   const [mod] = await Promise.all([import('./extractHighlights'), import('./pdfWorker')]);
   return mod.extractHighlights;
 }
+
+/** 원문 보기 화면용: 문서 열기·페이지별 추출 */
+export async function loadPdfTools() {
+  const [mod] = await Promise.all([import('./extractHighlights'), import('./pdfWorker')]);
+  return { openPdf: mod.openPdf, extractPage: mod.extractPage };
+}

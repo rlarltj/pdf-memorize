@@ -25,6 +25,8 @@ const BROKEN_CHAR = /[\uE000-\uF8FF\uFFFD\u0000-\u0008\u000E-\u001F]/g;
 type Matrix = [number, number, number, number, number, number];
 export interface Rect { x0: number; y0: number; x1: number; y1: number; color: string }
 
+export type { Box } from './buildHighlights';
+
 const multiply = (m: Matrix, n: number[]): Matrix => [
   m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1],
   m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3],
@@ -134,10 +136,10 @@ export function annotationRects(annotations: HighlightAnnotation[]): Rect[] {
 }
 
 /** 사각형이 겹치면 나중에 그린(위에 보이는) 색이 이긴다. 두문자 노란색이 문구 배경 위에 칠해지는 경우. */
-function topmostColorAt(rects: Rect[], x: number, y: number): string | undefined {
+function topmostRectAt(rects: Rect[], x: number, y: number): Rect | undefined {
   for (let i = rects.length - 1; i >= 0; i--) {
     const r = rects[i];
-    if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) return r.color;
+    if (x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1) return r;
   }
   return undefined;
 }
@@ -153,7 +155,14 @@ function toPageChars(items: TextItem[], rects: Rect[]): PageChar[] {
       glyphs.forEach((ch, k) => {
         const cx = e + w * (k + 0.5);
         const cy = f + Math.abs(d) * 0.35;
-        chars.push({ ch, color: topmostColorAt(rects, cx, cy) });
+        const h = Math.abs(d);
+        const hit = topmostRectAt(rects, cx, cy);
+        // 칠해진 글자는 칠한 사각형을 영역으로 쓴다. 글자 폭 추정(묶음 폭 ÷ 글자 수)은 공백·기호가 섞이면 한두 글자 밀린다
+        // (2026-11-18 원문 보기에서 "§94①" 빈칸이 "의 취"까지 덮어 발견)
+        const box = hit
+          ? { x0: hit.x0, x1: hit.x1, y0: hit.y0, y1: hit.y1 }
+          : { x0: e + w * k, x1: e + w * (k + 1), y0: f - h * 0.22, y1: f + h * 0.88 };
+        chars.push({ ch, color: hit?.color, box });
       });
     }
     if (item.hasEOL) chars.push({ eol: true });
@@ -161,29 +170,55 @@ function toPageChars(items: TextItem[], rects: Rect[]): PageChar[] {
   return chars;
 }
 
-/** onProgress(처리한 페이지 수, 전체 페이지 수) */
-export async function extractHighlights(file: ArrayBuffer, onProgress?: (done: number, total: number) => void): Promise<ExtractResult> {
-  // isEvalSupported: false — 악성 PDF 폰트로 임의 코드를 실행하던 취약점(CVE-2024-4367) 계열을 막는 이중 방어. CSP도 eval을 막는다
-  const doc = await getDocument({ data: new Uint8Array(file), cMapPacked: true, isEvalSupported: false, ...pdfAssets }).promise;
-  const highlights: Highlight[] = [];
-  let annotationCount = 0;
+type PdfDocument = Awaited<ReturnType<typeof getDocument>['promise']>;
+export type { PdfDocument };
+
+/** isEvalSupported: false — 악성 PDF 폰트로 임의 코드를 실행하던 취약점(CVE-2024-4367) 계열을 막는 이중 방어. CSP도 eval을 막는다 */
+export function openPdf(file: ArrayBuffer): Promise<PdfDocument> {
+  return getDocument({ data: new Uint8Array(file), cMapPacked: true, isEvalSupported: false, ...pdfAssets }).promise;
+}
+
+export interface PageExtract {
+  highlights: Highlight[];
+  annotationCount: number;
+  textChars: number;
+  brokenChars: number;
+}
+
+/** 한 페이지의 하이라이트. 원문 보기 화면은 열어 둔 문서에서 보이는 페이지만 이걸로 다시 계산한다 */
+export async function extractPage(doc: PdfDocument, p: number): Promise<PageExtract> {
+  const page = await doc.getPage(p);
+  const annotations = (await page.getAnnotations()) as HighlightAnnotation[];
+  const items = (await page.getTextContent()).items as TextItem[];
   let textChars = 0;
   let brokenChars = 0;
+  for (const it of items) {
+    const str = it.str?.replace(/\s/g, '') ?? '';
+    textChars += str.length;
+    brokenChars += str.match(BROKEN_CHAR)?.length ?? 0;
+  }
+  // 주석은 페이지 내용 위에 그려지므로 배경색 사각형 뒤에 붙여 겹칠 때 이기게 한다
+  const rects = [...(await collectFillRects(page)), ...annotationRects(annotations)];
+  return {
+    highlights: rects.length > 0 ? buildHighlights(toPageChars(items, rects), p) : [],
+    annotationCount: annotations.filter((a) => a.subtype === 'Highlight').length,
+    textChars,
+    brokenChars,
+  };
+}
+
+/** onProgress(처리한 페이지 수, 전체 페이지 수) */
+export async function extractHighlights(file: ArrayBuffer, onProgress?: (done: number, total: number) => void): Promise<ExtractResult> {
+  const doc = await openPdf(file);
+  const result: ExtractResult = { numPages: doc.numPages, annotationCount: 0, textChars: 0, brokenChars: 0, highlights: [] };
   for (let p = 1; p <= doc.numPages; p++) {
-    const page = await doc.getPage(p);
-    const annotations = (await page.getAnnotations()) as HighlightAnnotation[];
-    annotationCount += annotations.filter((a) => a.subtype === 'Highlight').length;
-    const items = (await page.getTextContent()).items as TextItem[];
-    for (const it of items) {
-      const str = it.str?.replace(/\s/g, '') ?? '';
-      textChars += str.length;
-      brokenChars += str.match(BROKEN_CHAR)?.length ?? 0;
-    }
-    // 주석은 페이지 내용 위에 그려지므로 배경색 사각형 뒤에 붙여 겹칠 때 이기게 한다
-    const rects = [...(await collectFillRects(page)), ...annotationRects(annotations)];
-    if (rects.length > 0) highlights.push(...buildHighlights(toPageChars(items, rects), p));
+    const r = await extractPage(doc, p);
+    result.highlights.push(...r.highlights);
+    result.annotationCount += r.annotationCount;
+    result.textChars += r.textChars;
+    result.brokenChars += r.brokenChars;
     onProgress?.(p, doc.numPages);
   }
   await doc.destroy();
-  return { numPages: doc.numPages, annotationCount, textChars, brokenChars, highlights };
+  return result;
 }
