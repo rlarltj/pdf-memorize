@@ -113,7 +113,8 @@ export class IndexedDbStore implements StudyStore {
 
   async changedSince(since: Date) {
     const db = await this.db;
-    const after = (r: { updatedAt: Date }) => r.updatedAt.getTime() > since.getTime();
+    // 같은 밀리초에 바뀐 행을 놓치지 않도록 경계를 포함한다. 한 번 더 올라가는 것은 문제없다 (2026-11-18 Node 22에서 발견)
+    const after = (r: { updatedAt: Date }) => r.updatedAt.getTime() >= since.getTime();
     const [documents, cards] = await Promise.all([db.getAll('documents'), db.getAll('cards')]);
     return { documents: documents.filter(after), cards: cards.filter(after) };
   }
@@ -149,7 +150,8 @@ export class IndexedDbStore implements StudyStore {
     const db = await this.db;
     for (const t of changes.deletedDocuments) {
       const local = await db.get('documents', t.id);
-      if (!local || local.updatedAt.getTime() <= t.deletedAt.getTime()) await this.removeDocument(t.id);
+      // 같은 밀리초면 로컬을 남긴다: 삭제 직후 다시 올린 경우가 더 흔하다 (2026-11-18 Node 22에서 테스트 실패로 발견)
+      if (!local || local.updatedAt.getTime() < t.deletedAt.getTime()) await this.removeDocument(t.id);
     }
     // 로컬에서 지웠지만 아직 원격에 알리지 않은 대상은 되살리지 않는다
     const pending = await db.getAll('deletions');
@@ -165,7 +167,7 @@ export class IndexedDbStore implements StudyStore {
     }
     for (const t of changes.deletedCards) {
       const local = await tx.objectStore('cards').get(t.id);
-      if (local && local.updatedAt.getTime() <= t.deletedAt.getTime()) await tx.objectStore('cards').delete(t.id);
+      if (local && local.updatedAt.getTime() < t.deletedAt.getTime()) await tx.objectStore('cards').delete(t.id);
     }
     for (const c of changes.cards) {
       if (deletedCards.has(c.id) || deletedDocs.has(c.documentId)) continue;
