@@ -1,0 +1,15 @@
+# Cloudflare Workers 정적 자산 응답 헤더
+# CSP: 외부 스크립트 없음. connect-src는 Supabase(동기화·로그인), style-src 'unsafe-inline'은 React style 속성(색 견본)용
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# 파일명에 해시가 붙은 빌드 산출물은 바뀌지 않는다
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# pdf.js CMap·폰트는 pdfjs-dist 버전이 바뀔 때만 달라진다
+/pdfjs/*
+  Cache-Control: public, max-age=604800
